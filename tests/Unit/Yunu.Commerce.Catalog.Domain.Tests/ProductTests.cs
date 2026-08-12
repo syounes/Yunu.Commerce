@@ -1,0 +1,107 @@
+﻿using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Products.Events;
+using Yunu.Commerce.Catalog.Domain.Products.Skus;
+using Xunit;
+
+namespace Yunu.Commerce.Catalog.Domain.Tests;
+
+public class ProductTests
+{
+    private static Product CreateProduct(string name = "Apple iPhone 17 Pro")
+    {
+        return Product.Create(
+            ProductId.New(),
+            new ProductName(name),
+            BrandId.New(),
+            CategoryId.New());
+    }
+
+    [Fact]
+    public void Create_Should_Default_To_Draft_Status()
+    {
+        var product = CreateProduct();
+
+        Assert.Equal(ProductStatus.Draft, product.Status);
+    }
+
+    [Fact]
+    public void Create_Should_Raise_ProductCreatedDomainEvent()
+    {
+        var product = CreateProduct();
+
+        var domainEvent = Assert.Single(product.DomainEvents);
+        Assert.IsType<ProductCreatedDomainEvent>(domainEvent);
+        Assert.Equal(product.Id, ((ProductCreatedDomainEvent)domainEvent).ProductId);
+    }
+
+    [Fact]
+    public void Rename_With_Different_Name_Should_Update_Name_And_Raise_Event()
+    {
+        var product = CreateProduct();
+        product.ClearDomainEvents();
+
+        var newName = new ProductName("Apple iPhone 17 Pro Max");
+        product.Rename(newName);
+
+        Assert.Equal(newName, product.Name);
+
+        var domainEvent = Assert.Single(product.DomainEvents);
+        var renamedEvent = Assert.IsType<ProductRenamedDomainEvent>(domainEvent);
+        Assert.Equal(product.Id, renamedEvent.ProductId);
+        Assert.Equal(newName, renamedEvent.NewName);
+    }
+
+    [Fact]
+    public void Rename_With_Same_Name_Should_Not_Raise_Event()
+    {
+        var product = CreateProduct("Apple iPhone 17 Pro");
+        product.ClearDomainEvents();
+
+        product.Rename(new ProductName("Apple iPhone 17 Pro"));
+
+        Assert.Empty(product.DomainEvents);
+    }
+
+    [Fact]
+    public void AddSku_Should_Append_To_Skus_And_Raise_Event()
+    {
+        var product = CreateProduct();
+        product.ClearDomainEvents();
+
+        var skuId = SkuId.New();
+        var sku = product.AddSku(skuId, new SkuCode("256GB-BLACK"), SkuStatus.Draft);
+
+        Assert.Single(product.Skus);
+        Assert.Same(sku, product.Skus.Single());
+
+        var domainEvent = Assert.Single(product.DomainEvents);
+        var addedEvent = Assert.IsType<SkuAddedDomainEvent>(domainEvent);
+        Assert.Equal(product.Id, addedEvent.ProductId);
+        Assert.Equal(skuId, addedEvent.SkuId);
+    }
+
+    [Fact]
+    public void AddSku_With_Duplicate_SkuCode_Should_Succeed_Without_Error()
+    {
+        var product = CreateProduct();
+
+        product.AddSku(SkuId.New(), new SkuCode("DUP-CODE"), SkuStatus.Draft);
+        product.AddSku(SkuId.New(), new SkuCode("DUP-CODE"), SkuStatus.Draft);
+
+        Assert.Equal(2, product.Skus.Count);
+    }
+
+    [Fact]
+    public void ClearDomainEvents_Should_Empty_Collection()
+    {
+        var product = CreateProduct();
+
+        Assert.NotEmpty(product.DomainEvents);
+
+        product.ClearDomainEvents();
+
+        Assert.Empty(product.DomainEvents);
+    }
+}
