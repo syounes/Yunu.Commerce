@@ -1,0 +1,8 @@
+﻿{
+  "Catalog": {
+    "Mongo": {
+      "ConnectionString": "",
+      "DatabaseName": "yunu_catalog"
+    }
+  }
+}

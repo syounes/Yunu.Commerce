@@ -1,12 +1,12 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
-using Xunit;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Products.Skus;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
+using Xunit;
 
 namespace Yunu.Commerce.Catalog.IntegrationTests;
 

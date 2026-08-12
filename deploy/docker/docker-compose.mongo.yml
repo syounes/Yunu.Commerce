@@ -1,0 +1,13 @@
+﻿services:
+  mongo:
+    image: mongo:7.0.14
+    container_name: yunu-commerce-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: yunu_catalog
+    volumes:
+      - yunu-mongo-data:/data/db
+
+volumes:
+  yunu-mongo-data:
