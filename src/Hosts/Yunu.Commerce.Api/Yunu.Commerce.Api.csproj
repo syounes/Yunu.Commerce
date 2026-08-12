@@ -33,7 +33,8 @@
   </ItemGroup>
 
   <ItemGroup>
-
+    <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
 </Project>
+

@@ -13,8 +13,14 @@ public static class CatalogProductEndpoints
 {
     public static IEndpointRouteBuilder MapCatalogProductEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/catalog/products", CreateProductAsync);
-        app.MapGet("/api/catalog/products/{productId}", GetProductByIdAsync);
+        app.MapPost("/api/catalog/products", CreateProductAsync)
+            .Produces<CreateProductResponse>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        app.MapGet("/api/catalog/products/{productId}", GetProductByIdAsync)
+            .Produces<ProductResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         return app;
     }
