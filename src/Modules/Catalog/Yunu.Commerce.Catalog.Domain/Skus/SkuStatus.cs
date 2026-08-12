@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Domain.Products.Skus;
+﻿namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
 /// Sku lifecycle classification (docs/domains/catalog.md §20).

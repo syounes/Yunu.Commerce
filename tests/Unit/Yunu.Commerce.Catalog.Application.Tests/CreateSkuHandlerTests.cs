@@ -1,5 +1,6 @@
-﻿using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
-using Xunit;
+﻿using Xunit;
+using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
+using Yunu.Commerce.Catalog.Domain.Skus;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
@@ -22,7 +23,7 @@ public class CreateSkuHandlerTests
         Assert.NotEqual(Guid.Empty, result.SkuId);
         Assert.Equal(1, repository.AddAsyncCallCount);
 
-        var stored = await repository.GetByIdAsync(new Yunu.Commerce.Catalog.Domain.Products.Skus.SkuId(result.SkuId), CancellationToken.None);
+        var stored = await repository.GetByIdAsync(new SkuId(result.SkuId), CancellationToken.None);
         Assert.NotNull(stored);
         Assert.Equal("256GB-BLACK", stored!.Code.Value);
         Assert.Equal(command.ProductId, stored.ProductId.Value);

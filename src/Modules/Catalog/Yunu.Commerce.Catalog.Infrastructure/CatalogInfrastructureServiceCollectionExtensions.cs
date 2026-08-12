@@ -2,7 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
+using Yunu.Commerce.Catalog.Domain.Skus;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;

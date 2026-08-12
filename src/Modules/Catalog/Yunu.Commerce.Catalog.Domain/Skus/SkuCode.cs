@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Domain.Products.Skus;
+﻿namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
 /// Sku code Value Object (docs/domains/catalog.md §46).

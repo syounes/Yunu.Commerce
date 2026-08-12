@@ -1,6 +1,7 @@
-﻿using Yunu.Commerce.SharedKernel;
+﻿using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.SharedKernel;
 
-namespace Yunu.Commerce.Catalog.Domain.Products.Skus.Events;
+namespace Yunu.Commerce.Catalog.Domain.Skus.Events;
 
 /// <summary>
 /// Raised when a Sku transitions to Archived ("discontinued") (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).

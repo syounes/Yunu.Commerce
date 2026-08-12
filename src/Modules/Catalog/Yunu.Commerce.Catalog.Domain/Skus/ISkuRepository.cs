@@ -1,4 +1,6 @@
-﻿namespace Yunu.Commerce.Catalog.Domain.Products.Skus;
+﻿using Yunu.Commerce.Catalog.Domain.Products;
+
+namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
 /// Persistence port for the Sku Aggregate Root (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).

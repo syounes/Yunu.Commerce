@@ -1,7 +1,8 @@
-﻿using Yunu.Commerce.Catalog.Domain.Products.Skus.Events;
+﻿using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Skus.Events;
 using Yunu.Commerce.SharedKernel;
 
-namespace Yunu.Commerce.Catalog.Domain.Products.Skus;
+namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
 /// Sku Aggregate Root (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).

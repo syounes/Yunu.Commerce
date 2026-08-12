@@ -1,7 +1,7 @@
-﻿using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
-using Yunu.Commerce.Catalog.Domain.Products.Skus.Events;
-using Xunit;
+﻿using Xunit;
+using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Skus;
+using Yunu.Commerce.Catalog.Domain.Skus.Events;
 
 namespace Yunu.Commerce.Catalog.Domain.Tests;
 

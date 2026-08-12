@@ -1,6 +1,6 @@
 ﻿using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
+using Yunu.Commerce.Catalog.Domain.Skus;
 
 namespace Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
 

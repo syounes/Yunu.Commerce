@@ -2,7 +2,7 @@
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
+using Yunu.Commerce.Catalog.Domain.Skus;
 using Xunit;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;

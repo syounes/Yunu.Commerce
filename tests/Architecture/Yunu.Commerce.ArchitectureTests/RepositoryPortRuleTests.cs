@@ -26,7 +26,7 @@ public class RepositoryPortRuleTests
     };
 
     private const string ProductRepositoryTypeName = "Yunu.Commerce.Catalog.Domain.Products.IProductRepository";
-    private const string SkuRepositoryTypeName = "Yunu.Commerce.Catalog.Domain.Products.Skus.ISkuRepository";
+    private const string SkuRepositoryTypeName = "Yunu.Commerce.Catalog.Domain.Skus.ISkuRepository";
 
     public static IEnumerable<object[]> RepositoryPortTypeNames() => new[]
     {

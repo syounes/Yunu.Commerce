@@ -1,7 +1,7 @@
-﻿using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
+﻿using Xunit;
+using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
-using Xunit;
+using Yunu.Commerce.Catalog.Domain.Skus;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 

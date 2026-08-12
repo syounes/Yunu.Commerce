@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Domain.Products.Skus;
+﻿namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
 /// Strongly typed, database-independent identity for a Sku (docs/domains/catalog.md §8).
