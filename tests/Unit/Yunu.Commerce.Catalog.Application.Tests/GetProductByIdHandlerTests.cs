@@ -12,7 +12,8 @@ public class GetProductByIdHandlerTests
     [Fact]
     public async Task Handle_With_Existing_Product_Should_Return_Mapped_Response()
     {
-        var repository = new FakeProductRepository();
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
 
         var product = Product.Create(
             ProductId.New(),
@@ -20,11 +21,12 @@ public class GetProductByIdHandlerTests
             BrandId.New(),
             CategoryId.New());
 
-        product.AddSku(SkuId.New(), new SkuCode("256GB-BLACK"), SkuStatus.Draft);
+        await productRepository.AddAsync(product, CancellationToken.None);
 
-        await repository.AddAsync(product, CancellationToken.None);
+        var sku = Sku.Create(SkuId.New(), product.Id, new SkuCode("256GB-BLACK"));
+        await skuRepository.AddAsync(sku, CancellationToken.None);
 
-        var handler = new GetProductByIdHandler(repository);
+        var handler = new GetProductByIdHandler(productRepository, skuRepository);
         var query = new GetProductByIdQuery { ProductId = product.Id.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -36,16 +38,17 @@ public class GetProductByIdHandlerTests
         Assert.Equal(product.CategoryId.Value, response.CategoryId);
         Assert.Equal(ProductStatus.Draft.ToString(), response.Status);
 
-        var sku = Assert.Single(response.Skus);
-        Assert.Equal("256GB-BLACK", sku.Code);
-        Assert.Equal(SkuStatus.Draft.ToString(), sku.Status);
+        var skuResponse = Assert.Single(response.Skus);
+        Assert.Equal("256GB-BLACK", skuResponse.Code);
+        Assert.Equal(SkuStatus.Draft.ToString(), skuResponse.Status);
     }
 
     [Fact]
     public async Task Handle_With_NonExistent_Product_Should_Return_Null()
     {
-        var repository = new FakeProductRepository();
-        var handler = new GetProductByIdHandler(repository);
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
+        var handler = new GetProductByIdHandler(productRepository, skuRepository);
 
         var query = new GetProductByIdQuery { ProductId = Guid.NewGuid() };
 

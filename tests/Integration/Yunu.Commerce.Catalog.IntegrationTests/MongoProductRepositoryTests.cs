@@ -4,7 +4,6 @@ using Testcontainers.MongoDb;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 using Xunit;
 
@@ -14,6 +13,10 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// Integration tests for MongoProductRepository against a real MongoDB instance
 /// via Testcontainers (docs/architecture/06-solution-structure.md §42). Covers
 /// only AddAsync/GetByIdAsync, matching the current IProductRepository contract.
+///
+/// Sku is no longer embedded in Product persistence
+/// (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md); Sku
+/// round-tripping is covered by MongoSkuRepositoryTests.
 /// </summary>
 public sealed class MongoProductRepositoryTests : IAsyncLifetime
 {
@@ -42,7 +45,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AddAsync_Then_GetByIdAsync_Should_RoundTrip_Product_Without_Skus()
+    public async Task AddAsync_Then_GetByIdAsync_Should_RoundTrip_Product()
     {
         var product = Product.Create(
             ProductId.New(),
@@ -60,37 +63,6 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         Assert.Equal(product.BrandId, retrieved.BrandId);
         Assert.Equal(product.CategoryId, retrieved.CategoryId);
         Assert.Equal(product.Status, retrieved.Status);
-        Assert.Empty(retrieved.Skus);
-    }
-
-    [Fact]
-    public async Task AddAsync_Then_GetByIdAsync_Should_RoundTrip_Product_With_Skus()
-    {
-        var product = Product.Create(
-            ProductId.New(),
-            new ProductName("Apple iPhone 17 Pro"),
-            BrandId.New(),
-            CategoryId.New());
-
-        product.AddSku(SkuId.New(), new SkuCode("256GB-BLACK"), SkuStatus.Draft);
-        product.AddSku(SkuId.New(), new SkuCode("512GB-BLACK"), SkuStatus.Active);
-
-        await _repository.AddAsync(product, CancellationToken.None);
-
-        var retrieved = await _repository.GetByIdAsync(product.Id, CancellationToken.None);
-
-        Assert.NotNull(retrieved);
-        Assert.Equal(2, retrieved!.Skus.Count);
-
-        var originalSkus = product.Skus.OrderBy(s => s.Id.Value).ToList();
-        var retrievedSkus = retrieved.Skus.OrderBy(s => s.Id.Value).ToList();
-
-        for (var i = 0; i < originalSkus.Count; i++)
-        {
-            Assert.Equal(originalSkus[i].Id, retrievedSkus[i].Id);
-            Assert.Equal(originalSkus[i].Code, retrievedSkus[i].Code);
-            Assert.Equal(originalSkus[i].Status, retrievedSkus[i].Status);
-        }
     }
 
     [Fact]
@@ -102,7 +74,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ProductStatus_And_SkuStatus_Should_RoundTrip_As_Correct_Enum_Values()
+    public async Task ProductStatus_Should_RoundTrip_As_Correct_Enum_Value()
     {
         var product = Product.Create(
             ProductId.New(),
@@ -111,14 +83,11 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             CategoryId.New(),
             ProductStatus.PendingReview);
 
-        product.AddSku(SkuId.New(), new SkuCode("SKU-STATUS-TEST"), SkuStatus.Inactive);
-
         await _repository.AddAsync(product, CancellationToken.None);
 
         var retrieved = await _repository.GetByIdAsync(product.Id, CancellationToken.None);
 
         Assert.NotNull(retrieved);
         Assert.Equal(ProductStatus.PendingReview, retrieved!.Status);
-        Assert.Equal(SkuStatus.Inactive, retrieved.Skus.Single().Status);
     }
 }

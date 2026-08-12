@@ -1,6 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
+using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
+using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
+using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
 
 namespace Yunu.Commerce.Catalog.Application;
 
@@ -15,6 +18,9 @@ public static class CatalogApplicationServiceCollectionExtensions
     {
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<GetProductByIdHandler>();
+        services.AddScoped<CreateSkuHandler>();
+        services.AddScoped<GetSkuByIdHandler>();
+        services.AddScoped<GetSkusByProductIdHandler>();
 
         return services;
     }

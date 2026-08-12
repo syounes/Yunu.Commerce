@@ -1,7 +1,6 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 
@@ -10,6 +9,8 @@ namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 /// persistence document. No AutoMapper is used (docs/adr/0001 §9, "prefer explicit
 /// mapping"). This mapper reads only the fields required to reconstitute a valid
 /// Product; it never reads or writes Product.DomainEvents.
+///
+/// Sku is no longer part of Product persistence (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).
 /// </summary>
 internal static class ProductDocumentMapper
 {
@@ -21,15 +22,7 @@ internal static class ProductDocumentMapper
             Name = product.Name.Value,
             BrandId = product.BrandId.Value,
             CategoryId = product.CategoryId.Value,
-            Status = product.Status.ToString(),
-            Skus = product.Skus
-                .Select(sku => new SkuDocument
-                {
-                    SkuId = sku.Id.Value,
-                    Code = sku.Code.Value,
-                    Status = sku.Status.ToString()
-                })
-                .ToList()
+            Status = product.Status.ToString()
         };
     }
 
@@ -41,14 +34,6 @@ internal static class ProductDocumentMapper
             new BrandId(document.BrandId),
             new CategoryId(document.CategoryId),
             Enum.Parse<ProductStatus>(document.Status));
-
-        foreach (var skuDocument in document.Skus)
-        {
-            product.AddSku(
-                new SkuId(skuDocument.SkuId),
-                new SkuCode(skuDocument.Code),
-                Enum.Parse<SkuStatus>(skuDocument.Status));
-        }
 
         product.ClearDomainEvents();
 

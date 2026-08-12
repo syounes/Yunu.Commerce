@@ -1,21 +1,19 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
 using Yunu.Commerce.SharedKernel;
 
 namespace Yunu.Commerce.Catalog.Domain.Products;
 
 /// <summary>
 /// Product Aggregate Root (docs/domains/catalog.md §4-§6).
-/// Owns the canonical descriptive identity of a commercial product and its Skus.
+/// Owns the canonical descriptive identity of a commercial product.
 ///
-/// Modeling decision: Sku is implemented as an Entity owned by this Aggregate for
-/// this initial slice (docs/domains/catalog.md §46-§47). This is a first-cut
-/// decision, not guaranteed to remain non-breaking if revisited: extracting Sku
-/// into an independent Aggregate later could require changes to transactional
-/// consistency boundaries, repository contracts, Domain Events, and Application
-/// use case flows.
+/// Modeling decision (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md):
+/// Sku is now an independent Aggregate Root that references this Product only by
+/// <see cref="ProductId"/>. Product no longer owns, constructs or persists Sku
+/// state; composition of Product + Skus for read purposes belongs to the
+/// Application/read-model layer, not to this Aggregate.
 ///
 /// Lifecycle transition behavior (Activate/Deactivate/Archive/SubmitForReview) is
 /// intentionally deferred until a documented use case defines the transition rules
@@ -23,7 +21,6 @@ namespace Yunu.Commerce.Catalog.Domain.Products;
 /// </summary>
 public sealed class Product
 {
-    private readonly List<Sku> _skus = new();
     private readonly List<IDomainEvent> _domainEvents = new();
 
     public ProductId Id { get; }
@@ -35,8 +32,6 @@ public sealed class Product
     public CategoryId CategoryId { get; }
 
     public ProductStatus Status { get; private set; }
-
-    public IReadOnlyCollection<Sku> Skus => _skus;
 
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents;
 
@@ -80,21 +75,6 @@ public sealed class Product
         Name = newName;
 
         _domainEvents.Add(new ProductRenamedDomainEvent(Id, previousName, newName));
-    }
-
-    /// <summary>
-    /// Adds a Sku to this Product. Duplicate Sku codes are not validated in this
-    /// phase because Sku uniqueness rules are not yet documented
-    /// (docs/domains/catalog.md §22).
-    /// </summary>
-    public Sku AddSku(SkuId id, SkuCode code, SkuStatus status)
-    {
-        var sku = new Sku(id, code, status);
-
-        _skus.Add(sku);
-        _domainEvents.Add(new SkuAddedDomainEvent(Id, id));
-
-        return sku;
     }
 
     public void ClearDomainEvents()

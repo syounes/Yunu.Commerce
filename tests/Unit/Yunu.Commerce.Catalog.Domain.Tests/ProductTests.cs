@@ -2,7 +2,6 @@
 using Yunu.Commerce.Catalog.Domain.Categories;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
-using Yunu.Commerce.Catalog.Domain.Products.Skus;
 using Xunit;
 
 namespace Yunu.Commerce.Catalog.Domain.Tests;
@@ -62,35 +61,6 @@ public class ProductTests
         product.Rename(new ProductName("Apple iPhone 17 Pro"));
 
         Assert.Empty(product.DomainEvents);
-    }
-
-    [Fact]
-    public void AddSku_Should_Append_To_Skus_And_Raise_Event()
-    {
-        var product = CreateProduct();
-        product.ClearDomainEvents();
-
-        var skuId = SkuId.New();
-        var sku = product.AddSku(skuId, new SkuCode("256GB-BLACK"), SkuStatus.Draft);
-
-        Assert.Single(product.Skus);
-        Assert.Same(sku, product.Skus.Single());
-
-        var domainEvent = Assert.Single(product.DomainEvents);
-        var addedEvent = Assert.IsType<SkuAddedDomainEvent>(domainEvent);
-        Assert.Equal(product.Id, addedEvent.ProductId);
-        Assert.Equal(skuId, addedEvent.SkuId);
-    }
-
-    [Fact]
-    public void AddSku_With_Duplicate_SkuCode_Should_Succeed_Without_Error()
-    {
-        var product = CreateProduct();
-
-        product.AddSku(SkuId.New(), new SkuCode("DUP-CODE"), SkuStatus.Draft);
-        product.AddSku(SkuId.New(), new SkuCode("DUP-CODE"), SkuStatus.Draft);
-
-        Assert.Equal(2, product.Skus.Count);
     }
 
     [Fact]

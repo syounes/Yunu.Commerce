@@ -8,6 +8,9 @@ namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 /// Infrastructure; the Product Aggregate is never serialized directly and carries
 /// no BSON attributes (docs/domains/catalog.md §41, docs/adr/0003 §9).
 /// DomainEvents are intentionally absent: they are never persisted.
+///
+/// SKU data is no longer embedded here (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md);
+/// Skus are persisted independently in the "skus" collection.
 /// </summary>
 public sealed class ProductDocument
 {
@@ -24,6 +27,4 @@ public sealed class ProductDocument
     public Guid CategoryId { get; set; }
 
     public string Status { get; set; } = string.Empty;
-
-    public List<SkuDocument> Skus { get; set; } = new();
 }
