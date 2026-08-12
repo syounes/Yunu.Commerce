@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../src/Modules/Catalog/Yunu.Commerce.Catalog.Infrastructure/Yunu.Commerce.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Sellers/Yunu.Commerce.Sellers.Infrastructure/Yunu.Commerce.Sellers.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Offers/Yunu.Commerce.Offers.Infrastructure/Yunu.Commerce.Offers.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Pricing/Yunu.Commerce.Pricing.Infrastructure/Yunu.Commerce.Pricing.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Availability/Yunu.Commerce.Availability.Infrastructure/Yunu.Commerce.Availability.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Fulfillment/Yunu.Commerce.Fulfillment.Infrastructure/Yunu.Commerce.Fulfillment.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Freight/Yunu.Commerce.Freight.Infrastructure/Yunu.Commerce.Freight.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Search/Yunu.Commerce.Search.Infrastructure/Yunu.Commerce.Search.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/AI/Yunu.Commerce.AI.Infrastructure/Yunu.Commerce.AI.Infrastructure.csproj" />
+    <ProjectReference Include="../../../src/Modules/Integrations/Yunu.Commerce.Integrations.Infrastructure/Yunu.Commerce.Integrations.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+</Project>

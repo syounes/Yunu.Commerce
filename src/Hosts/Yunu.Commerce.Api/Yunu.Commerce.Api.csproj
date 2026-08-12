@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <!-- shared compilation settings inherited from Directory.Build.props -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Modules/Catalog/Yunu.Commerce.Catalog.Application/Yunu.Commerce.Catalog.Application.csproj" />
+    <ProjectReference Include="../../Modules/Catalog/Yunu.Commerce.Catalog.Infrastructure/Yunu.Commerce.Catalog.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Sellers/Yunu.Commerce.Sellers.Application/Yunu.Commerce.Sellers.Application.csproj" />
+    <ProjectReference Include="../../Modules/Sellers/Yunu.Commerce.Sellers.Infrastructure/Yunu.Commerce.Sellers.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Offers/Yunu.Commerce.Offers.Application/Yunu.Commerce.Offers.Application.csproj" />
+    <ProjectReference Include="../../Modules/Offers/Yunu.Commerce.Offers.Infrastructure/Yunu.Commerce.Offers.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Pricing/Yunu.Commerce.Pricing.Application/Yunu.Commerce.Pricing.Application.csproj" />
+    <ProjectReference Include="../../Modules/Pricing/Yunu.Commerce.Pricing.Infrastructure/Yunu.Commerce.Pricing.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Availability/Yunu.Commerce.Availability.Application/Yunu.Commerce.Availability.Application.csproj" />
+    <ProjectReference Include="../../Modules/Availability/Yunu.Commerce.Availability.Infrastructure/Yunu.Commerce.Availability.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Fulfillment/Yunu.Commerce.Fulfillment.Application/Yunu.Commerce.Fulfillment.Application.csproj" />
+    <ProjectReference Include="../../Modules/Fulfillment/Yunu.Commerce.Fulfillment.Infrastructure/Yunu.Commerce.Fulfillment.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Freight/Yunu.Commerce.Freight.Application/Yunu.Commerce.Freight.Application.csproj" />
+    <ProjectReference Include="../../Modules/Freight/Yunu.Commerce.Freight.Infrastructure/Yunu.Commerce.Freight.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Search/Yunu.Commerce.Search.Application/Yunu.Commerce.Search.Application.csproj" />
+    <ProjectReference Include="../../Modules/Search/Yunu.Commerce.Search.Infrastructure/Yunu.Commerce.Search.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/AI/Yunu.Commerce.AI.Application/Yunu.Commerce.AI.Application.csproj" />
+    <ProjectReference Include="../../Modules/AI/Yunu.Commerce.AI.Infrastructure/Yunu.Commerce.AI.Infrastructure.csproj" />
+    <ProjectReference Include="../../Modules/Integrations/Yunu.Commerce.Integrations.Application/Yunu.Commerce.Integrations.Application.csproj" />
+    <ProjectReference Include="../../Modules/Integrations/Yunu.Commerce.Integrations.Infrastructure/Yunu.Commerce.Integrations.Infrastructure.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/Yunu.Commerce.SharedKernel/Yunu.Commerce.SharedKernel.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/Yunu.Commerce.Contracts/Yunu.Commerce.Contracts.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/Yunu.Commerce.EventBus/Yunu.Commerce.EventBus.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/Yunu.Commerce.Observability/Yunu.Commerce.Observability.csproj" />
+    <ProjectReference Include="../../BuildingBlocks/Yunu.Commerce.Security/Yunu.Commerce.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+
+  </ItemGroup>
+
+</Project>

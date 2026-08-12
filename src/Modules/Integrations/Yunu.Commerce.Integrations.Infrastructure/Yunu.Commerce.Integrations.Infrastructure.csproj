@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- shared compilation settings inherited from Directory.Build.props -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Yunu.Commerce.Integrations.Application/Yunu.Commerce.Integrations.Application.csproj" />
+    <ProjectReference Include="../Yunu.Commerce.Integrations.Contracts/Yunu.Commerce.Integrations.Contracts.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/Yunu.Commerce.EventBus/Yunu.Commerce.EventBus.csproj" />
+    <ProjectReference Include="../../../BuildingBlocks/Yunu.Commerce.Observability/Yunu.Commerce.Observability.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+  </ItemGroup>
+
+</Project>
