@@ -2,6 +2,7 @@
 using Yunu.Commerce.Catalog.Application;
 using Yunu.Commerce.Catalog.Infrastructure;
 using Yunu.Commerce.Api.Products;
+using Yunu.Commerce.Api.Skus;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -68,5 +69,6 @@ app.MapHealthChecks("/health/ready");
 app.MapGet("/", () => Results.Ok(new { service = "Yunu.Commerce.Api", status = "running" }));
 
 app.MapCatalogProductEndpoints();
+app.MapCatalogSkuEndpoints();
 
 app.Run();

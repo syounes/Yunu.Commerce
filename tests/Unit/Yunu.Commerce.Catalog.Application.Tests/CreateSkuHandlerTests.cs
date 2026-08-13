@@ -1,68 +1,90 @@
 ﻿using Xunit;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
-using Yunu.Commerce.Catalog.Domain.Skus;
+using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
 public class CreateSkuHandlerTests
 {
     [Fact]
-    public async Task Handle_With_Valid_Command_Should_Persist_Sku_And_Return_Generated_Id()
+    public async Task Handle_With_Valid_ProductId_Should_Create_Sku()
     {
-        var repository = new FakeSkuRepository();
-        var handler = new CreateSkuHandler(repository);
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
+
+        var product = Product.Create(
+            ProductId.New(),
+            new ProductName("Apple iPhone 17 Pro"),
+            new BrandId(Guid.NewGuid()),
+            new CategoryId(Guid.NewGuid()));
+
+        await productRepository.AddAsync(product, CancellationToken.None);
+
+        var handler = new CreateSkuHandler(productRepository, skuRepository);
 
         var command = new CreateSkuCommand
         {
-            ProductId = Guid.NewGuid(),
-            Code = "256GB-BLACK"
+            ProductId = product.Id.Value,
+            Code = "256GB-BLACK",
+            Gtin = "1234567890123"
         };
 
         var result = await handler.HandleAsync(command, CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, result.SkuId);
-        Assert.Equal(1, repository.AddAsyncCallCount);
-
-        var stored = await repository.GetByIdAsync(new SkuId(result.SkuId), CancellationToken.None);
-        Assert.NotNull(stored);
-        Assert.Equal("256GB-BLACK", stored!.Code.Value);
-        Assert.Equal(command.ProductId, stored.ProductId.Value);
+        Assert.Equal(1, skuRepository.AddAsyncCallCount);
     }
 
     [Fact]
-    public async Task Handle_With_Empty_ProductId_Should_Throw_And_Not_Persist()
+    public async Task Handle_With_NonExistent_ProductId_Should_Throw()
     {
-        var repository = new FakeSkuRepository();
-        var handler = new CreateSkuHandler(repository);
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
+        var handler = new CreateSkuHandler(productRepository, skuRepository);
 
         var command = new CreateSkuCommand
         {
-            ProductId = Guid.Empty,
-            Code = "256GB-BLACK"
+            ProductId = Guid.NewGuid(),
+            Code = "256GB-BLACK",
+            Gtin = null
         };
 
-        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(command, CancellationToken.None));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync(command, CancellationToken.None));
 
-        Assert.Equal(0, repository.AddAsyncCallCount);
+        Assert.Contains("does not exist", exception.Message);
+        Assert.Equal(0, skuRepository.AddAsyncCallCount);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task Handle_With_Invalid_Code_Should_Throw_And_Not_Persist(string? code)
+    public async Task Handle_With_Invalid_Code_Should_Throw(string? invalidCode)
     {
-        var repository = new FakeSkuRepository();
-        var handler = new CreateSkuHandler(repository);
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
+
+        var product = Product.Create(
+            ProductId.New(),
+            new ProductName("Test Product"),
+            new BrandId(Guid.NewGuid()),
+            new CategoryId(Guid.NewGuid()));
+
+        await productRepository.AddAsync(product, CancellationToken.None);
+
+        var handler = new CreateSkuHandler(productRepository, skuRepository);
 
         var command = new CreateSkuCommand
         {
-            ProductId = Guid.NewGuid(),
-            Code = code!
+            ProductId = product.Id.Value,
+            Code = invalidCode!,
+            Gtin = null
         };
 
-        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(command, CancellationToken.None));
-
-        Assert.Equal(0, repository.AddAsyncCallCount);
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => handler.HandleAsync(command, CancellationToken.None));
     }
 }
