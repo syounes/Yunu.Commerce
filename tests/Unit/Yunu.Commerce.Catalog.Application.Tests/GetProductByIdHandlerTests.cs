@@ -18,6 +18,7 @@ public class GetProductByIdHandlerTests
         var product = Product.Create(
             ProductId.New(),
             new ProductName("Apple iPhone 17 Pro"),
+            "Tênis esportivo masculino para corrida e uso diário.",
             BrandId.New(),
             CategoryId.New());
 
@@ -34,6 +35,7 @@ public class GetProductByIdHandlerTests
         Assert.NotNull(response);
         Assert.Equal(product.Id.Value, response!.ProductId);
         Assert.Equal("Apple iPhone 17 Pro", response.Name);
+        Assert.Equal("Tênis esportivo masculino para corrida e uso diário.", response.Description);
         Assert.Equal(product.BrandId.Value, response.BrandId);
         Assert.Equal(product.CategoryId.Value, response.CategoryId);
         Assert.Equal(ProductStatus.Draft.ToString(), response.Status);
@@ -41,6 +43,30 @@ public class GetProductByIdHandlerTests
         var skuResponse = Assert.Single(response.Skus);
         Assert.Equal("256GB-BLACK", skuResponse.Code);
         Assert.Equal(SkuStatus.Draft.ToString(), skuResponse.Status);
+    }
+
+    [Fact]
+    public async Task Handle_With_Product_Without_Description_Should_Return_Null_Description()
+    {
+        var productRepository = new FakeProductRepository();
+        var skuRepository = new FakeSkuRepository();
+
+        var product = Product.Create(
+            ProductId.New(),
+            new ProductName("Apple iPhone 17 Pro"),
+            description: null,
+            BrandId.New(),
+            CategoryId.New());
+
+        await productRepository.AddAsync(product, CancellationToken.None);
+
+        var handler = new GetProductByIdHandler(productRepository, skuRepository);
+        var query = new GetProductByIdQuery { ProductId = product.Id.Value };
+
+        var response = await handler.HandleAsync(query, CancellationToken.None);
+
+        Assert.NotNull(response);
+        Assert.Null(response!.Description);
     }
 
     [Fact]

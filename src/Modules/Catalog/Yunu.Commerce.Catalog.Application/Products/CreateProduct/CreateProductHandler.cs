@@ -30,7 +30,7 @@ public sealed class CreateProductHandler
         var brandId = new BrandId(command.BrandId);
         var categoryId = new CategoryId(command.CategoryId);
 
-        var product = Product.Create(productId, name, brandId, categoryId);
+        var product = Product.Create(productId, name, command.Description, brandId, categoryId);
 
         await _productRepository.AddAsync(product, cancellationToken);
 

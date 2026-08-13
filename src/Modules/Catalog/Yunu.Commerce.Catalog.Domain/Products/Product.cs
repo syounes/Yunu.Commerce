@@ -27,6 +27,13 @@ public sealed class Product
 
     public ProductName Name { get; private set; }
 
+    /// <summary>
+    /// Optional free-text description of the Product. Kept as a plain string
+    /// (not a Value Object) because no validation/business rule currently
+    /// justifies one; introduce one later only if a documented rule requires it.
+    /// </summary>
+    public string? Description { get; private set; }
+
     public BrandId BrandId { get; }
 
     public CategoryId CategoryId { get; }
@@ -35,10 +42,11 @@ public sealed class Product
 
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents;
 
-    private Product(ProductId id, ProductName name, BrandId brandId, CategoryId categoryId, ProductStatus status)
+    private Product(ProductId id, ProductName name, string? description, BrandId brandId, CategoryId categoryId, ProductStatus status)
     {
         Id = id;
         Name = name;
+        Description = description;
         BrandId = brandId;
         CategoryId = categoryId;
         Status = status;
@@ -47,11 +55,12 @@ public sealed class Product
     public static Product Create(
         ProductId id,
         ProductName name,
+        string? description,
         BrandId brandId,
         CategoryId categoryId,
         ProductStatus status = ProductStatus.Draft)
     {
-        var product = new Product(id, name, brandId, categoryId, status);
+        var product = new Product(id, name, description, brandId, categoryId, status);
 
         product._domainEvents.Add(new ProductCreatedDomainEvent(id));
 

@@ -35,6 +35,7 @@ public static class CatalogProductEndpoints
             var command = new CreateProductCommand
             {
                 Name = request.Name,
+                Description = request.Description,
                 BrandId = request.BrandId,
                 CategoryId = request.CategoryId
             };

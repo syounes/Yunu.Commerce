@@ -20,6 +20,7 @@ internal static class ProductDocumentMapper
         {
             Id = product.Id.Value,
             Name = product.Name.Value,
+            Description = product.Description,
             BrandId = product.BrandId.Value,
             CategoryId = product.CategoryId.Value,
             Status = product.Status.ToString()
@@ -31,6 +32,7 @@ internal static class ProductDocumentMapper
         var product = Product.Create(
             new ProductId(document.Id),
             new ProductName(document.Name),
+            document.Description,
             new BrandId(document.BrandId),
             new CategoryId(document.CategoryId),
             Enum.Parse<ProductStatus>(document.Status));

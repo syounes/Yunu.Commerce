@@ -8,11 +8,12 @@ namespace Yunu.Commerce.Catalog.Domain.Tests;
 
 public class ProductTests
 {
-    private static Product CreateProduct(string name = "Apple iPhone 17 Pro")
+    private static Product CreateProduct(string name = "Apple iPhone 17 Pro", string? description = null)
     {
         return Product.Create(
             ProductId.New(),
             new ProductName(name),
+            description,
             BrandId.New(),
             CategoryId.New());
     }
@@ -33,6 +34,22 @@ public class ProductTests
         var domainEvent = Assert.Single(product.DomainEvents);
         Assert.IsType<ProductCreatedDomainEvent>(domainEvent);
         Assert.Equal(product.Id, ((ProductCreatedDomainEvent)domainEvent).ProductId);
+    }
+
+    [Fact]
+    public void Create_With_Description_Should_Set_Description()
+    {
+        var product = CreateProduct(description: "Tênis esportivo masculino para corrida e uso diário.");
+
+        Assert.Equal("Tênis esportivo masculino para corrida e uso diário.", product.Description);
+    }
+
+    [Fact]
+    public void Create_Without_Description_Should_Leave_Description_Null()
+    {
+        var product = CreateProduct();
+
+        Assert.Null(product.Description);
     }
 
     [Fact]

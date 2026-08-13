@@ -41,6 +41,7 @@ public sealed class GetProductByIdHandler
         {
             ProductId = product.Id.Value,
             Name = product.Name.Value,
+            Description = product.Description,
             BrandId = product.BrandId.Value,
             CategoryId = product.CategoryId.Value,
             Status = product.Status.ToString(),

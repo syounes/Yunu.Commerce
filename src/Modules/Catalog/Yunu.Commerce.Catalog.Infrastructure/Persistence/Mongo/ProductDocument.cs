@@ -20,6 +20,8 @@ public sealed class ProductDocument
 
     public string Name { get; set; } = string.Empty;
 
+    public string? Description { get; set; }
+
     [BsonRepresentation(BsonType.String)]
     public Guid BrandId { get; set; }
 

@@ -17,6 +17,7 @@ public class CreateSkuHandlerTests
         var product = Product.Create(
             ProductId.New(),
             new ProductName("Apple iPhone 17 Pro"),
+            description: null,
             new BrandId(Guid.NewGuid()),
             new CategoryId(Guid.NewGuid()));
 
@@ -70,6 +71,7 @@ public class CreateSkuHandlerTests
         var product = Product.Create(
             ProductId.New(),
             new ProductName("Test Product"),
+            description: null,
             new BrandId(Guid.NewGuid()),
             new CategoryId(Guid.NewGuid()));
 

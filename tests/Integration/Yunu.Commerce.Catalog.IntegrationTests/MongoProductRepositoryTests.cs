@@ -50,6 +50,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         var product = Product.Create(
             ProductId.New(),
             new ProductName("Apple iPhone 17 Pro"),
+            "Apple's latest flagship smartphone.",
             BrandId.New(),
             CategoryId.New());
 
@@ -60,9 +61,28 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         Assert.NotNull(retrieved);
         Assert.Equal(product.Id, retrieved!.Id);
         Assert.Equal(product.Name, retrieved.Name);
+        Assert.Equal(product.Description, retrieved.Description);
         Assert.Equal(product.BrandId, retrieved.BrandId);
         Assert.Equal(product.CategoryId, retrieved.CategoryId);
         Assert.Equal(product.Status, retrieved.Status);
+    }
+
+    [Fact]
+    public async Task AddAsync_Then_GetByIdAsync_Without_Description_Should_RoundTrip_Null()
+    {
+        var product = Product.Create(
+            ProductId.New(),
+            new ProductName("No Description Product"),
+            description: null,
+            BrandId.New(),
+            CategoryId.New());
+
+        await _repository.AddAsync(product, CancellationToken.None);
+
+        var retrieved = await _repository.GetByIdAsync(product.Id, CancellationToken.None);
+
+        Assert.NotNull(retrieved);
+        Assert.Null(retrieved!.Description);
     }
 
     [Fact]
@@ -79,6 +99,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         var product = Product.Create(
             ProductId.New(),
             new ProductName("Status RoundTrip Product"),
+            description: null,
             BrandId.New(),
             CategoryId.New(),
             ProductStatus.PendingReview);
