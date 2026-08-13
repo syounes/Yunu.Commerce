@@ -1,5 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
 using Xunit;
@@ -8,14 +8,25 @@ namespace Yunu.Commerce.Catalog.Domain.Tests;
 
 public class ProductTests
 {
-    private static Product CreateProduct(string name = "Apple iPhone 17 Pro", string? description = null)
+    private static GoogleCategoryReference CreateGoogleCategory()
+    {
+        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+    }
+
+    private static Product CreateProduct(
+        string name = "Apple iPhone 17 Pro",
+        string? description = null,
+        BrandId? brandId = null,
+        FamilyId? familyId = null,
+        GoogleCategoryReference? googleCategory = null)
     {
         return Product.Create(
             ProductId.New(),
             new ProductName(name),
             description,
-            BrandId.New(),
-            CategoryId.New());
+            brandId,
+            familyId,
+            googleCategory ?? CreateGoogleCategory());
     }
 
     [Fact]
@@ -50,6 +61,56 @@ public class ProductTests
         var product = CreateProduct();
 
         Assert.Null(product.Description);
+    }
+
+    [Fact]
+    public void Create_Should_Require_GoogleCategory()
+    {
+        Assert.Throws<ArgumentNullException>(() => Product.Create(
+            ProductId.New(),
+            new ProductName("Apple iPhone 17 Pro"),
+            description: null,
+            brandId: null,
+            familyId: null,
+            googleCategory: null!));
+    }
+
+    [Fact]
+    public void Create_Should_Accept_Null_BrandId()
+    {
+        var product = CreateProduct(brandId: null);
+
+        Assert.Null(product.BrandId);
+    }
+
+    [Fact]
+    public void Create_Should_Accept_Null_FamilyId()
+    {
+        var product = CreateProduct(familyId: null);
+
+        Assert.Null(product.FamilyId);
+    }
+
+    [Fact]
+    public void Create_Should_Accept_Both_BrandId_And_FamilyId()
+    {
+        var brandId = BrandId.New();
+        var familyId = FamilyId.New();
+
+        var product = CreateProduct(brandId: brandId, familyId: familyId);
+
+        Assert.Equal(brandId, product.BrandId);
+        Assert.Equal(familyId, product.FamilyId);
+    }
+
+    [Fact]
+    public void Create_Should_Store_GoogleCategory()
+    {
+        var googleCategory = CreateGoogleCategory();
+
+        var product = CreateProduct(googleCategory: googleCategory);
+
+        Assert.Equal(googleCategory, product.GoogleCategory);
     }
 
     [Fact]

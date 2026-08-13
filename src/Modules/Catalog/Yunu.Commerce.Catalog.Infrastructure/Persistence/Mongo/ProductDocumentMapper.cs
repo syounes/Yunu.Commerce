@@ -1,5 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
@@ -21,8 +21,13 @@ internal static class ProductDocumentMapper
             Id = product.Id.Value,
             Name = product.Name.Value,
             Description = product.Description,
-            BrandId = product.BrandId.Value,
-            CategoryId = product.CategoryId.Value,
+            BrandId = product.BrandId?.Value,
+            FamilyId = product.FamilyId?.Value,
+            GoogleCategory = new GoogleCategoryDocument
+            {
+                Id = product.GoogleCategory.Id,
+                Path = product.GoogleCategory.Path
+            },
             Status = product.Status.ToString()
         };
     }
@@ -33,8 +38,9 @@ internal static class ProductDocumentMapper
             new ProductId(document.Id),
             new ProductName(document.Name),
             document.Description,
-            new BrandId(document.BrandId),
-            new CategoryId(document.CategoryId),
+            document.BrandId is { } brandId ? new BrandId(brandId) : (BrandId?)null,
+            document.FamilyId is { } familyId ? new FamilyId(familyId) : (FamilyId?)null,
+            new GoogleCategoryReference(document.GoogleCategory.Id, document.GoogleCategory.Path),
             Enum.Parse<ProductStatus>(document.Status));
 
         product.ClearDomainEvents();

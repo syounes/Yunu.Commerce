@@ -37,7 +37,8 @@ public static class CatalogProductEndpoints
                 Name = request.Name,
                 Description = request.Description,
                 BrandId = request.BrandId,
-                CategoryId = request.CategoryId
+                FamilyId = request.FamilyId,
+                GoogleCategoryId = request.GoogleCategoryId
             };
 
             var result = await handler.HandleAsync(command, cancellationToken);

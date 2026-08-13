@@ -42,8 +42,13 @@ public sealed class GetProductByIdHandler
             ProductId = product.Id.Value,
             Name = product.Name.Value,
             Description = product.Description,
-            BrandId = product.BrandId.Value,
-            CategoryId = product.CategoryId.Value,
+            BrandId = product.BrandId?.Value,
+            FamilyId = product.FamilyId?.Value,
+            GoogleCategory = new GoogleCategoryResponse
+            {
+                Id = product.GoogleCategory.Id,
+                Path = product.GoogleCategory.Path
+            },
             Status = product.Status.ToString(),
             Skus = skus
                 .Select(sku => new SkuResponse

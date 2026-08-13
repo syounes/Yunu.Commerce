@@ -6,6 +6,13 @@
 /// <see cref="CreateProductHandler"/> via ProductId.New(). External system
 /// identifiers (ERP, supplier, marketplace) are out of scope for this command
 /// and will be modeled separately by a future ExternalReference use case.
+///
+/// Classification modeling decision: BrandId and FamilyId (the internal Yunu
+/// hierarchy reference) are optional, because internal classification may be
+/// assigned after creation. GoogleCategoryId is required and is resolved by
+/// <see cref="CreateProductHandler"/> against the canonical Google Product
+/// Taxonomy before the Product Aggregate is created; only the taxonomy id is
+/// accepted here, never a caller-supplied path/fullPath.
 /// </summary>
 public sealed class CreateProductCommand
 {
@@ -13,7 +20,9 @@ public sealed class CreateProductCommand
 
     public string? Description { get; init; }
 
-    public required Guid BrandId { get; init; }
+    public Guid? BrandId { get; init; }
 
-    public required Guid CategoryId { get; init; }
+    public Guid? FamilyId { get; init; }
+
+    public required int GoogleCategoryId { get; init; }
 }

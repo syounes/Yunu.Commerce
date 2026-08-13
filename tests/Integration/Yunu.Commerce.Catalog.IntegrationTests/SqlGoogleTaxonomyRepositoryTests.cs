@@ -16,7 +16,7 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// </summary>
 public sealed class SqlGoogleTaxonomyRepositoryTests : IAsyncLifetime
 {
-    private readonly MsSqlContainer _sqlContainer = new MsSqlBuilder().Build();
+    private readonly MsSqlContainer _sqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
     private SqlGoogleTaxonomyRepository _repository = null!;
     private string _connectionString = null!;
 

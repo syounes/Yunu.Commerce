@@ -2,7 +2,7 @@
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
 using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 using Xunit;
@@ -23,6 +23,11 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
     private readonly MongoDbContainer _mongoContainer = new MongoDbBuilder("mongo:8.0").Build();
     private IMongoClient _mongoClient = null!;
     private MongoProductRepository _repository = null!;
+
+    private static GoogleCategoryReference CreateGoogleCategory()
+    {
+        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+    }
 
     public async Task InitializeAsync()
     {
@@ -52,7 +57,8 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("Apple iPhone 17 Pro"),
             "Apple's latest flagship smartphone.",
             BrandId.New(),
-            CategoryId.New());
+            FamilyId.New(),
+            CreateGoogleCategory());
 
         await _repository.AddAsync(product, CancellationToken.None);
 
@@ -63,7 +69,8 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         Assert.Equal(product.Name, retrieved.Name);
         Assert.Equal(product.Description, retrieved.Description);
         Assert.Equal(product.BrandId, retrieved.BrandId);
-        Assert.Equal(product.CategoryId, retrieved.CategoryId);
+        Assert.Equal(product.FamilyId, retrieved.FamilyId);
+        Assert.Equal(product.GoogleCategory, retrieved.GoogleCategory);
         Assert.Equal(product.Status, retrieved.Status);
     }
 
@@ -75,7 +82,8 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("No Description Product"),
             description: null,
             BrandId.New(),
-            CategoryId.New());
+            FamilyId.New(),
+            CreateGoogleCategory());
 
         await _repository.AddAsync(product, CancellationToken.None);
 
@@ -83,6 +91,27 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
 
         Assert.NotNull(retrieved);
         Assert.Null(retrieved!.Description);
+    }
+
+    [Fact]
+    public async Task AddAsync_Then_GetByIdAsync_With_Null_BrandId_And_FamilyId_Should_RoundTrip_Null()
+    {
+        var product = Product.Create(
+            ProductId.New(),
+            new ProductName("No Internal Classification Product"),
+            description: null,
+            brandId: null,
+            familyId: null,
+            CreateGoogleCategory());
+
+        await _repository.AddAsync(product, CancellationToken.None);
+
+        var retrieved = await _repository.GetByIdAsync(product.Id, CancellationToken.None);
+
+        Assert.NotNull(retrieved);
+        Assert.Null(retrieved!.BrandId);
+        Assert.Null(retrieved.FamilyId);
+        Assert.Equal(product.GoogleCategory, retrieved.GoogleCategory);
     }
 
     [Fact]
@@ -101,7 +130,8 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("Status RoundTrip Product"),
             description: null,
             BrandId.New(),
-            CategoryId.New(),
+            FamilyId.New(),
+            CreateGoogleCategory(),
             ProductStatus.PendingReview);
 
         await _repository.AddAsync(product, CancellationToken.None);

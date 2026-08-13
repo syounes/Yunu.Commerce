@@ -11,7 +11,16 @@ namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 ///
 /// SKU data is no longer embedded here (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md);
 /// Skus are persisted independently in the "skus" collection.
+///
+/// Classification modeling decision: CategoryId is no longer part of the
+/// current Product model. [BsonIgnoreExtraElements] preserves compatibility
+/// with pre-existing local development documents that still contain a legacy
+/// "categoryId" field; that field is silently ignored on read and never
+/// written by new code. BrandId/FamilyId are nullable to reflect the optional
+/// internal classification. GoogleCategory is required for all newly created
+/// Products.
 /// </summary>
+[BsonIgnoreExtraElements]
 public sealed class ProductDocument
 {
     [BsonId]
@@ -23,10 +32,23 @@ public sealed class ProductDocument
     public string? Description { get; set; }
 
     [BsonRepresentation(BsonType.String)]
-    public Guid BrandId { get; set; }
+    public Guid? BrandId { get; set; }
 
     [BsonRepresentation(BsonType.String)]
-    public Guid CategoryId { get; set; }
+    public Guid? FamilyId { get; set; }
+
+    public GoogleCategoryDocument GoogleCategory { get; set; } = null!;
 
     public string Status { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Embedded denormalized snapshot of a Product's Google Product Taxonomy
+/// classification (docs/domains/catalog.md - external classification systems).
+/// </summary>
+public sealed class GoogleCategoryDocument
+{
+    public int Id { get; set; }
+
+    public string Path { get; set; } = string.Empty;
 }

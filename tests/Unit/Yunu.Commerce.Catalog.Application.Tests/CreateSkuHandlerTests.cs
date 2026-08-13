@@ -1,13 +1,18 @@
 ﻿using Xunit;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Categories;
+using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
 public class CreateSkuHandlerTests
 {
+    private static GoogleCategoryReference CreateGoogleCategory()
+    {
+        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+    }
+
     [Fact]
     public async Task Handle_With_Valid_ProductId_Should_Create_Sku()
     {
@@ -19,7 +24,8 @@ public class CreateSkuHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             new BrandId(Guid.NewGuid()),
-            new CategoryId(Guid.NewGuid()));
+            new FamilyId(Guid.NewGuid()),
+            CreateGoogleCategory());
 
         await productRepository.AddAsync(product, CancellationToken.None);
 
@@ -73,7 +79,8 @@ public class CreateSkuHandlerTests
             new ProductName("Test Product"),
             description: null,
             new BrandId(Guid.NewGuid()),
-            new CategoryId(Guid.NewGuid()));
+            new FamilyId(Guid.NewGuid()),
+            CreateGoogleCategory());
 
         await productRepository.AddAsync(product, CancellationToken.None);
 
