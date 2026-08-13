@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
@@ -21,6 +22,8 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateSkuHandler>();
         services.AddScoped<GetSkuByIdHandler>();
         services.AddScoped<GetSkusByProductIdHandler>();
+
+        services.AddScoped<SynchronizeGoogleTaxonomyHandler>();
 
         return services;
     }

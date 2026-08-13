@@ -1,0 +1,163 @@
+name: yunu-commerce-local
+
+services:
+  mongo:
+    image: mongo:7.0.14
+    container_name: yunu-commerce-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - yunu_mongo_data:/data/db
+    networks:
+      - yunu-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: yunu-commerce-sqlserver
+    hostname: yunu-commerce-sqlserver
+    restart: unless-stopped
+    ports:
+      - "1433:1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    volumes:
+      - yunu_sql_data:/var/opt/mssql
+    networks:
+      - yunu-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" || exit 1'
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  kafka:
+    image: confluentinc/cp-kafka:8.3.1
+    container_name: yunu-commerce-kafka
+    hostname: kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      CLUSTER_ID: "${KAFKA_CLUSTER_ID}"
+    volumes:
+      - yunu_kafka_data:/var/lib/kafka/data
+    networks:
+      - yunu-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  redis:
+    image: redis:8.0
+    container_name: yunu-commerce-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - yunu_redis_data:/data
+    networks:
+      - yunu-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.4
+    container_name: yunu-commerce-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "9200:9200"
+    volumes:
+      - yunu_elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - yunu-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent http://localhost:9200/_cluster/health >/dev/null || exit 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.4.4
+    container_name: yunu-commerce-kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: "http://elasticsearch:9200"
+    ports:
+      - "5601:5601"
+    networks:
+      - yunu-network
+
+networks:
+  yunu-network:
+    name: yunu-commerce-network
+    driver: bridge
+
+volumes:
+  yunu_mongo_data:
+    name: yunu-commerce-mongo-data
+
+  yunu_sql_data:
+    name: yunu-commerce-sql-data
+
+  yunu_kafka_data:
+    name: yunu-commerce-kafka-data
+
+  yunu_redis_data:
+    name: yunu-commerce-redis-data
+
+  yunu_elasticsearch_data:
+    name: yunu-commerce-elasticsearch-data
