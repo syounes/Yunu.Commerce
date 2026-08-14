@@ -1,4 +1,4 @@
-using Yunu.Commerce.Observability;
+﻿using Yunu.Commerce.Observability;
 using Yunu.Commerce.Worker;
 using Yunu.Commerce.Catalog.Application;
 using Yunu.Commerce.Catalog.Infrastructure;
@@ -34,7 +34,7 @@ builder.Services
     .AddFulfillmentApplication()
     .AddFreightApplication()
     .AddSearchApplication()
-    .AddAIApplication()
+    .AddAIApplication(builder.Configuration)
     .AddIntegrationsApplication();
 
 builder.Services

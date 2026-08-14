@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <!-- shared compilation settings inherited from Directory.Build.props -->
+    <UserSecretsId>36c1e02c-fdd7-4a3a-9e2d-6e4a2d8e3c1f</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>

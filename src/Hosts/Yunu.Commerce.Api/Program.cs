@@ -4,6 +4,7 @@ using Yunu.Commerce.Catalog.Infrastructure;
 using Yunu.Commerce.Api.Products;
 using Yunu.Commerce.Api.Skus;
 using Yunu.Commerce.Api.GoogleTaxonomy;
+using Yunu.Commerce.Api.AI;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -36,7 +37,7 @@ builder.Services
     .AddFulfillmentApplication()
     .AddFreightApplication()
     .AddSearchApplication()
-    .AddAIApplication()
+    .AddAIApplication(builder.Configuration)
     .AddIntegrationsApplication();
 
 builder.Services
@@ -72,5 +73,6 @@ app.MapGet("/", () => Results.Ok(new { service = "Yunu.Commerce.Api", status = "
 app.MapCatalogProductEndpoints();
 app.MapCatalogSkuEndpoints();
 app.MapCatalogGoogleTaxonomyEndpoints();
+app.MapAIEmbeddingsEndpoints();
 
 app.Run();
