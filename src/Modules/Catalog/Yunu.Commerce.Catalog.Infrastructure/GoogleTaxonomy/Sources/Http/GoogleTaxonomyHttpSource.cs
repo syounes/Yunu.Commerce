@@ -1,8 +1,8 @@
 ﻿using System.Net.Http;
 using Microsoft.Extensions.Options;
-using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
-namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
 
 /// <summary>
 /// HTTP-based adapter implementing <see cref="IGoogleTaxonomySource"/>, downloading

@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 
 /// <summary>
 /// Environment-specific SQL Server configuration for Google Taxonomy persistence

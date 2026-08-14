@@ -1,4 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 namespace Yunu.Commerce.Api.GoogleTaxonomy;
 

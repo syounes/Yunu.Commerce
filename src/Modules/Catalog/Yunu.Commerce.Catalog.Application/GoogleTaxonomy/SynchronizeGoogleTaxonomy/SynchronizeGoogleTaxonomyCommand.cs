@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Input for triggering a Google Product Taxonomy synchronization. Empty for

@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Parsed representation of a single Google Product Taxonomy row

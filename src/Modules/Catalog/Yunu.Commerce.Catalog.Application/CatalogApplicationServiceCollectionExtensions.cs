@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;

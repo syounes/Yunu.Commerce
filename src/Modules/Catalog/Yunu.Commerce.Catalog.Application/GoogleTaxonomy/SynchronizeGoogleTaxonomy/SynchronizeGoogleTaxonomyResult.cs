@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Outcome returned by <see cref="SynchronizeGoogleTaxonomyHandler"/> to the API layer.

@@ -1,6 +1,6 @@
-﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
-namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Synchronization.InMemory;
 
 /// <summary>
 /// Process-local (single-instance) implementation of

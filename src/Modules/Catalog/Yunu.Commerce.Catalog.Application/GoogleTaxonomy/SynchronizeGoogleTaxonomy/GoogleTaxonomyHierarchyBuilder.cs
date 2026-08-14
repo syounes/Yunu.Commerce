@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Reconstructs parent/child relationships from Google's flat, path-based

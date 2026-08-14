@@ -1,4 +1,4 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Port abstracting retrieval of the raw Google Product Taxonomy text feed.

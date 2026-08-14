@@ -1,4 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
@@ -22,7 +23,7 @@ internal sealed class FakeGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         return Task.FromResult(category);
     }
 
-    public Task<GoogleTaxonomySynchronizationResult> SynchronizeAsync(
+    public Task<GoogleTaxonomyPersistenceResult> SynchronizeAsync(
         IReadOnlyCollection<GoogleTaxonomyCategoryItem> categories,
         string sourceLanguage,
         string sourceUrl,

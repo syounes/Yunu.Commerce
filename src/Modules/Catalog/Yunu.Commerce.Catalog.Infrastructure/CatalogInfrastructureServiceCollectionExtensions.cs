@@ -2,9 +2,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
-using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
+using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
+using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Synchronization.InMemory;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;

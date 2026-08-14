@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Options;
 using Testcontainers.MsSql;
 using Xunit;
-using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
-using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
+using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 
 namespace Yunu.Commerce.Catalog.IntegrationTests;
 

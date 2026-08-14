@@ -1,4 +1,6 @@
-﻿namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
+
+namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 
 /// <summary>
 /// Port for persisting a synchronized Google Product Taxonomy snapshot.
@@ -7,7 +9,7 @@
 /// </summary>
 public interface IGoogleTaxonomyRepository
 {
-    Task<GoogleTaxonomySynchronizationResult> SynchronizeAsync(
+    Task<GoogleTaxonomyPersistenceResult> SynchronizeAsync(
         IReadOnlyCollection<GoogleTaxonomyCategoryItem> categories,
         string sourceLanguage,
         string sourceUrl,

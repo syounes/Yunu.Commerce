@@ -1,6 +1,6 @@
 ﻿using System.Globalization;
 
-namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Parses raw Google Product Taxonomy lines into structured, unvalidated rows.

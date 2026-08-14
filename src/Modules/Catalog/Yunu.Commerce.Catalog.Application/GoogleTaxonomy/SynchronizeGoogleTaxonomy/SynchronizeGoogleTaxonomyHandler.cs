@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+namespace Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 /// <summary>
 /// Orchestrates a full Google Product Taxonomy synchronization:

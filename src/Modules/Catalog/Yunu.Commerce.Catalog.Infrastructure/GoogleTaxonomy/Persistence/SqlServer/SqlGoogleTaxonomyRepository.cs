@@ -1,8 +1,9 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Options;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
-namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy;
+namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 
 /// <summary>
 /// SQL Server adapter implementing <see cref="IGoogleTaxonomyRepository"/>
@@ -25,7 +26,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         _connectionString = options.Value.ConnectionString;
     }
 
-    public async Task<GoogleTaxonomySynchronizationResult> SynchronizeAsync(
+    public async Task<GoogleTaxonomyPersistenceResult> SynchronizeAsync(
         IReadOnlyCollection<GoogleTaxonomyCategoryItem> categories,
         string sourceLanguage,
         string sourceUrl,
@@ -88,7 +89,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
 
             await transaction.CommitAsync(cancellationToken);
 
-            return new GoogleTaxonomySynchronizationResult(categories.Count, inserted, updated, deactivated);
+            return new GoogleTaxonomyPersistenceResult(categories.Count, inserted, updated, deactivated);
         }
         catch (Exception ex)
         {

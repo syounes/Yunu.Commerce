@@ -1,5 +1,5 @@
 ﻿using Xunit;
-using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 
 namespace Yunu.Commerce.Catalog.Application.Tests.GoogleTaxonomy;
 
