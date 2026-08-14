@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- shared compilation settings inherited from Directory.Build.props -->
@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../Yunu.Commerce.Catalog.Domain/Yunu.Commerce.Catalog.Domain.csproj" />
     <ProjectReference Include="../../../BuildingBlocks/Yunu.Commerce.SharedKernel/Yunu.Commerce.SharedKernel.csproj" />
+    <ProjectReference Include="../../AI/Yunu.Commerce.AI.Application/Yunu.Commerce.AI.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>

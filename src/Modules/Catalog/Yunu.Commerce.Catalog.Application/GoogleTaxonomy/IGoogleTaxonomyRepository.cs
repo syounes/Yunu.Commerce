@@ -28,4 +28,11 @@ public interface IGoogleTaxonomyRepository
     Task<IReadOnlyCollection<GoogleTaxonomyCategoryResponse>> GetAncestorsAsync(
         int googleCategoryId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns every currently active Google Taxonomy category. Used by the
+    /// embedding synchronization use case to project the full active taxonomy
+    /// into the pgvector store.
+    /// </summary>
+    Task<IReadOnlyCollection<GoogleTaxonomyCategoryResponse>> GetActiveAsync(CancellationToken cancellationToken);
 }

@@ -203,6 +203,31 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
             .ToArray();
     }
 
+    public async Task<IReadOnlyCollection<GoogleTaxonomyCategoryResponse>> GetActiveAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        const string sql = """
+            SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive
+            FROM GoogleTaxonomyCategories
+            WHERE IsActive = 1
+            ORDER BY GoogleCategoryId
+            """;
+
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var results = new List<GoogleTaxonomyCategoryResponse>();
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(ReadCategoryResponse(reader));
+        }
+
+        return results;
+    }
+
     private static GoogleTaxonomyCategoryResponse ReadCategoryResponse(SqlDataReader reader)
     {
         return new GoogleTaxonomyCategoryResponse

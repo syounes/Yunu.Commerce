@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
@@ -24,6 +26,8 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GetSkusByProductIdHandler>();
 
         services.AddScoped<SynchronizeGoogleTaxonomyHandler>();
+        services.AddScoped<GenerateGoogleTaxonomyEmbeddingHandler>();
+        services.AddScoped<SynchronizeGoogleTaxonomyEmbeddingsHandler>();
 
         return services;
     }

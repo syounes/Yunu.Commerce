@@ -1,10 +1,14 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
+using Npgsql;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
+using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Synchronization.InMemory;
@@ -45,6 +49,19 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoogleTaxonomySource, GoogleTaxonomyHttpSource>();
         services.AddSingleton<IGoogleTaxonomyRepository, SqlGoogleTaxonomyRepository>();
         services.AddSingleton<IGoogleTaxonomySynchronizationGuard, InMemoryGoogleTaxonomySynchronizationGuard>();
+
+        services.AddSingleton(sp =>
+        {
+            var connectionString = configuration.GetConnectionString("VectorStore");
+            var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+            dataSourceBuilder.UseVector();
+            return dataSourceBuilder.Build();
+        });
+
+        services.AddSingleton<IGoogleTaxonomyEmbeddingRepository, PostgreSqlGoogleTaxonomyEmbeddingRepository>();
+
+        services.Configure<GoogleTaxonomyEmbeddingsSyncOptions>(configuration.GetSection("Catalog:GoogleTaxonomyEmbeddings"));
+        services.AddSingleton<IGoogleTaxonomyEmbeddingSynchronizationGuard, InMemoryGoogleTaxonomyEmbeddingSynchronizationGuard>();
 
         return services;
     }

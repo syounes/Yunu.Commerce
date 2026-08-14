@@ -1,5 +1,8 @@
 ﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
+using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
+using Yunu.Commerce.AI.Application.Embeddings;
 
 namespace Yunu.Commerce.Api.GoogleTaxonomy;
 
@@ -32,6 +35,20 @@ public static class CatalogGoogleTaxonomyEndpoints
 
         app.MapGet("/api/catalog/google-taxonomy/{googleCategoryId:int}/ancestors", GetAncestorsAsync)
             .Produces<IReadOnlyCollection<GoogleTaxonomyAncestorResponse>>(StatusCodes.Status200OK);
+
+        app.MapPost("/api/catalog/google-taxonomy/embeddings", GenerateEmbeddingAsync)
+            .WithSummary("Generate and persist a Google taxonomy category embedding")
+            .WithDescription("Requests a semantic embedding for the given Google category hierarchy from the AI module and persists it in the PostgreSQL + pgvector vector store.")
+            .Produces<GenerateGoogleTaxonomyEmbeddingResponse>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
+
+        app.MapPost("/api/admin/catalog/google-taxonomy/embeddings/synchronize", SynchronizeEmbeddingsAsync)
+            .WithSummary("Synchronize the pgvector projection of the entire active Google Product Taxonomy")
+            .WithDescription("Reads active categories from SQL Server, skips categories already up-to-date in PostgreSQL + pgvector, and generates/persists embeddings for the rest in limited-concurrency batches via the AI module.")
+            .Produces<SynchronizeGoogleTaxonomyEmbeddingsResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
         return app;
     }
@@ -110,5 +127,83 @@ public static class CatalogGoogleTaxonomyEndpoints
             .ToArray();
 
         return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GenerateEmbeddingAsync(
+        GenerateGoogleTaxonomyEmbeddingRequest request,
+        GenerateGoogleTaxonomyEmbeddingHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.CategoryPath))
+        {
+            return Results.Problem(
+                detail: "'categoryPath' must not be empty.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var command = new GenerateGoogleTaxonomyEmbeddingCommand(
+                request.GoogleCategoryId,
+                request.CategoryPath,
+                request.Provider);
+
+            var result = await handler.HandleAsync(command, cancellationToken);
+
+            var response = new GenerateGoogleTaxonomyEmbeddingResponse
+            {
+                Id = result.Id,
+                GoogleCategoryId = result.GoogleCategoryId,
+                CategoryPath = result.CategoryPath,
+                Provider = result.Provider,
+                Model = result.Model,
+                Dimensions = result.Dimensions
+            };
+
+            return Results.Ok(response);
+        }
+        catch (UnknownEmbeddingProviderException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+        catch (EmbeddingGenerationException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    private static async Task<IResult> SynchronizeEmbeddingsAsync(
+        SynchronizeGoogleTaxonomyEmbeddingsRequest? request,
+        SynchronizeGoogleTaxonomyEmbeddingsHandler handler,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var command = new SynchronizeGoogleTaxonomyEmbeddingsCommand(
+                request?.Provider,
+                request?.BatchSize);
+
+            var result = await handler.HandleAsync(command, cancellationToken);
+
+            var response = new SynchronizeGoogleTaxonomyEmbeddingsResponse
+            {
+                Provider = result.Provider,
+                Model = result.Model,
+                TotalCategories = result.TotalCategories,
+                Processed = result.Processed,
+                Generated = result.Generated,
+                Skipped = result.Skipped,
+                Failed = result.Failed,
+                StartedAtUtc = result.StartedAtUtc,
+                CompletedAtUtc = result.CompletedAtUtc,
+                DurationMilliseconds = result.DurationMilliseconds
+            };
+
+            return Results.Ok(response);
+        }
+        catch (GoogleTaxonomyEmbeddingSynchronizationInProgressException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+        }
     }
 }

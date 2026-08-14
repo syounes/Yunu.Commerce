@@ -47,4 +47,9 @@ internal sealed class FakeGoogleTaxonomyRepository : IGoogleTaxonomyRepository
     {
         throw new NotSupportedException("Not used by CreateProduct tests.");
     }
+
+    public Task<IReadOnlyCollection<GoogleTaxonomyCategoryResponse>> GetActiveAsync(CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException("Not used by CreateProduct tests.");
+    }
 }
