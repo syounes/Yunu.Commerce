@@ -4,6 +4,7 @@ using Yunu.Commerce.Catalog.Infrastructure;
 using Yunu.Commerce.Api.Products;
 using Yunu.Commerce.Api.Skus;
 using Yunu.Commerce.Api.GoogleTaxonomy;
+using Yunu.Commerce.Api.AttributeEmbeddings;
 using Yunu.Commerce.Api.AI;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
@@ -73,6 +74,7 @@ app.MapGet("/", () => Results.Ok(new { service = "Yunu.Commerce.Api", status = "
 app.MapCatalogProductEndpoints();
 app.MapCatalogSkuEndpoints();
 app.MapCatalogGoogleTaxonomyEndpoints();
+app.MapCatalogAttributeEmbeddingEndpoints();
 app.MapAIEmbeddingsEndpoints();
 
 app.Run();

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
@@ -28,6 +29,7 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<SynchronizeGoogleTaxonomyHandler>();
         services.AddScoped<GenerateGoogleTaxonomyEmbeddingHandler>();
         services.AddScoped<SynchronizeGoogleTaxonomyEmbeddingsHandler>();
+        services.AddScoped<SynchronizeAttributeEmbeddingsHandler>();
 
         return services;
     }
