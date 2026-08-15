@@ -31,7 +31,8 @@ public sealed class GetSkusByProductIdHandler
                 ProductId = sku.ProductId.Value,
                 Code = sku.Code.Value,
                 Gtin = sku.Gtin,
-                Status = sku.Status.ToString()
+                Status = sku.Status.ToString(),
+                Attributes = sku.Attributes.Select(SkuAttributeResponseMapper.ToResponse).ToArray()
             })
             .ToArray();
     }

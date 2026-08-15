@@ -33,7 +33,8 @@ public sealed class GetSkuByIdHandler
             ProductId = sku.ProductId.Value,
             Code = sku.Code.Value,
             Gtin = sku.Gtin,
-            Status = sku.Status.ToString()
+            Status = sku.Status.ToString(),
+            Attributes = sku.Attributes.Select(SkuAttributeResponseMapper.ToResponse).ToArray()
         };
     }
 }

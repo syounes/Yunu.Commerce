@@ -2,7 +2,8 @@
 
 /// <summary>
 /// Dedicated read model for a Sku, decoupled from the Domain Aggregate
-/// (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).
+/// (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md). Includes
+/// the Sku's assigned attributes (docs task: "SKU attribute foundation").
 /// </summary>
 public sealed class SkuDetailsResponse
 {
@@ -15,4 +16,6 @@ public sealed class SkuDetailsResponse
     public string? Gtin { get; init; }
 
     public required string Status { get; init; }
+
+    public IReadOnlyCollection<SkuAttributeResponse> Attributes { get; init; } = Array.Empty<SkuAttributeResponse>();
 }

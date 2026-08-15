@@ -2,12 +2,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Npgsql;
+using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
+using Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
@@ -49,6 +51,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoogleTaxonomySource, GoogleTaxonomyHttpSource>();
         services.AddSingleton<IGoogleTaxonomyRepository, SqlGoogleTaxonomyRepository>();
         services.AddSingleton<IGoogleTaxonomySynchronizationGuard, InMemoryGoogleTaxonomySynchronizationGuard>();
+        services.AddSingleton<IAttributeCatalogRepository, SqlAttributeCatalogRepository>();
 
         services.AddSingleton(sp =>
         {

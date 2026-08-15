@@ -350,6 +350,36 @@ Memory: 128GB
 
 Attribute types and management are not owned by Catalog.
 
+## 13.1. SKU Attribute Foundation (Implemented)
+
+SKU owns its assigned attribute values as part of its own Aggregate boundary
+(docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md). Product does
+not own, construct or persist Sku attributes.
+
+Attribute reference data — definitions, options and Google category attribute
+rules — is owned by SQL Server (`Catalog.AttributeDefinitions`,
+`Catalog.AttributeOptions`, `Catalog.GoogleCategoryAttributeRules`,
+deploy/sql/002_create_sku_attribute_catalog.sql). Catalog.Domain never queries
+SQL Server directly: Catalog.Application resolves and validates attribute
+definitions/options via `IAttributeCatalogRepository` before asking the Sku
+Aggregate (`Sku.AssignAttribute` / `ReplaceAttribute` / `RemoveAttribute`) to
+assign a validated `SkuAttribute`.
+
+MongoDB owns the transactional Sku Aggregate, including its complete
+attributes collection, persisted atomically with the rest of the Sku document
+(`SkuDocument.Attributes`, `skus` collection). Legacy Sku documents without an
+`Attributes` field hydrate as an empty attributes collection; no destructive
+migration is required.
+
+`Catalog.SkuAttributeValues` (SQL Server) is **not** written by this use case.
+It is reserved for a possible future relational projection/read model and must
+not be treated as the transactional source of truth for Sku attributes.
+
+AI/LLM-based interpretation of natural-language attribute values (automatic
+extraction, embeddings, semantic search, pgvector synchronization) is
+explicitly deferred; this foundation only supports explicit, structured
+attribute assignments supplied by a caller.
+
 ---
 
 # 14. Product Media

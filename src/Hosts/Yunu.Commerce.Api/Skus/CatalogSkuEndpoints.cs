@@ -51,14 +51,24 @@ public static class CatalogSkuEndpoints
             {
                 ProductId = parsedProductId,
                 Code = request.Code,
-                Gtin = request.Gtin
+                Gtin = request.Gtin,
+                Attributes = (request.Attributes ?? Array.Empty<SkuAttributeRequest>())
+                    .Select(a => new SkuAttributeInput
+                    {
+                        Code = a.Code,
+                        Sequence = a.Sequence,
+                        Value = a.Value,
+                        OptionCode = a.OptionCode
+                    })
+                    .ToArray()
             };
 
             var result = await handler.HandleAsync(command, cancellationToken);
 
             var response = new CreateSkuResponse
             {
-                SkuId = result.SkuId
+                SkuId = result.SkuId,
+                Attributes = result.Attributes
             };
 
             return Results.Created($"/api/catalog/skus/{result.SkuId}", response);
