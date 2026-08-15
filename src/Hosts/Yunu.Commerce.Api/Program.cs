@@ -8,6 +8,8 @@ using Yunu.Commerce.Api.AttributeEmbeddings;
 using Yunu.Commerce.Api.AI;
 using Yunu.Commerce.Api.AI.IntentRewriting;
 using Yunu.Commerce.Api.AI.AttributeResolution;
+using Yunu.Commerce.Api.AI.CategoryResolution;
+using Yunu.Commerce.Api.AI.CatalogIntentResolution;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -80,5 +82,7 @@ app.MapCatalogAttributeEmbeddingEndpoints();
 app.MapAIEmbeddingsEndpoints();
 app.MapIntentRewritingEndpoints();
 app.MapResolveAttributeHintsEndpoints();
+app.MapResolveGoogleCategoryEndpoints();
+app.MapCatalogIntentResolutionEndpoints();
 
 app.Run();

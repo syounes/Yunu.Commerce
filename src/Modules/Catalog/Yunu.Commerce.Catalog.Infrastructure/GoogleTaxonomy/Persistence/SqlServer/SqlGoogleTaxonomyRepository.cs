@@ -12,7 +12,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlSer
 /// small set of upsert/deactivate statements, and introducing EF Core or Dapper
 /// here would add unjustified complexity (docs §38, "avoid unnecessary abstractions").
 ///
-/// Persists to GoogleTaxonomyCategories and GoogleTaxonomyImports
+/// Persists to [Catalog].[GoogleTaxonomyCategories] and [Integration].[GoogleTaxonomyImports]
 /// (deploy/sql/001-google-taxonomy-tables.sql). Synchronization never issues a
 /// bulk DELETE; existing rows are upserted and rows absent from the current feed
 /// are marked IsActive = 0 (docs task: "Synchronization behavior").
@@ -111,7 +111,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
 
         const string sql = """
             SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive
-            FROM GoogleTaxonomyCategories
+            FROM [Catalog].[GoogleTaxonomyCategories]
             WHERE GoogleCategoryId = @GoogleCategoryId
             """;
 
@@ -140,7 +140,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
 
         const string sql = """
             SELECT TOP (@Limit) GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive
-            FROM GoogleTaxonomyCategories
+            FROM [Catalog].[GoogleTaxonomyCategories]
             WHERE IsActive = 1
               AND (Name LIKE @Pattern OR FullPath LIKE @Pattern)
             ORDER BY Level, Name
@@ -177,7 +177,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         {
             const string sql = """
                 SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive
-                FROM GoogleTaxonomyCategories
+                FROM [Catalog].[GoogleTaxonomyCategories]
                 WHERE GoogleCategoryId = @GoogleCategoryId
                 """;
 
@@ -210,7 +210,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
 
         const string sql = """
             SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive
-            FROM GoogleTaxonomyCategories
+            FROM [Catalog].[GoogleTaxonomyCategories]
             WHERE IsActive = 1
             ORDER BY GoogleCategoryId
             """;
@@ -249,7 +249,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
     {
         const string sql = """
             SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive, SourceLanguage
-            FROM GoogleTaxonomyCategories
+            FROM [Catalog].[GoogleTaxonomyCategories]
             """;
 
         await using var command = new SqlCommand(sql, connection, transaction);
@@ -283,7 +283,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            INSERT INTO GoogleTaxonomyCategories
+            INSERT INTO [Catalog].[GoogleTaxonomyCategories]
                 (GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive, SourceLanguage, CreatedAt, ImportedAt)
             VALUES
                 (@GoogleCategoryId, @ParentGoogleCategoryId, @Name, @FullPath, @Level, @IsLeaf, 1, @SourceLanguage, @Now, @ImportedAt)
@@ -312,7 +312,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            UPDATE GoogleTaxonomyCategories
+            UPDATE [Catalog].[GoogleTaxonomyCategories]
             SET ParentGoogleCategoryId = @ParentGoogleCategoryId,
                 Name = @Name,
                 FullPath = @FullPath,
@@ -347,7 +347,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            UPDATE GoogleTaxonomyCategories
+            UPDATE [Catalog].[GoogleTaxonomyCategories]
             SET ImportedAt = @ImportedAt
             WHERE GoogleCategoryId = @GoogleCategoryId
             """;
@@ -375,7 +375,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         foreach (var googleCategoryId in toDeactivate)
         {
             const string sql = """
-                UPDATE GoogleTaxonomyCategories
+                UPDATE [Catalog].[GoogleTaxonomyCategories]
                 SET IsActive = 0,
                     UpdatedAt = @Now
                 WHERE GoogleCategoryId = @GoogleCategoryId
@@ -401,7 +401,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            INSERT INTO GoogleTaxonomyImports
+            INSERT INTO [Integration].[GoogleTaxonomyImports]
                 (ImportId, SourceLanguage, SourceUrl, StartedAt, CategoryCount, InsertedCount, UpdatedCount, DeactivatedCount, Status)
             VALUES
                 (@ImportId, @SourceLanguage, @SourceUrl, @StartedAt, 0, 0, 0, 0, 'Processing')
@@ -427,7 +427,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            UPDATE GoogleTaxonomyImports
+            UPDATE [Integration].[GoogleTaxonomyImports]
             SET CompletedAt = @CompletedAt,
                 CategoryCount = @CategoryCount,
                 InsertedCount = @InsertedCount,
@@ -455,7 +455,7 @@ public sealed class SqlGoogleTaxonomyRepository : IGoogleTaxonomyRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            UPDATE GoogleTaxonomyImports
+            UPDATE [Integration].[GoogleTaxonomyImports]
             SET CompletedAt = @CompletedAt,
                 Status = 'Failed',
                 ErrorMessage = @ErrorMessage

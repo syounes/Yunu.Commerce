@@ -5,6 +5,7 @@ using Npgsql;
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 using Yunu.Commerce.Catalog.Application.AttributeResolution;
+using Yunu.Commerce.Catalog.Application.CategoryResolution;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
@@ -15,6 +16,8 @@ using Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.Synchronization.InMemory;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.SqlServer;
+using Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.PostgreSql;
+using Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
@@ -78,6 +81,9 @@ public static class CatalogInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IAttributeCatalogReader, SqlAttributeCatalogReader>();
         services.AddSingleton<IAttributeSemanticSearch, PostgreSqlAttributeSemanticSearch>();
+
+        services.AddSingleton<IGoogleCategoryCatalogReader, SqlGoogleCategoryCatalogReader>();
+        services.AddSingleton<IGoogleCategorySemanticSearch, PostgreSqlGoogleCategorySemanticSearch>();
 
         return services;
     }

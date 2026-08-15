@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 using Yunu.Commerce.Catalog.Application.AttributeResolution;
+using Yunu.Commerce.Catalog.Application.CatalogIntentResolution;
+using Yunu.Commerce.Catalog.Application.CategoryResolution;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
@@ -41,6 +43,15 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddSingleton<IValidateOptions<AttributeResolutionOptions>, AttributeResolutionOptionsValidator>();
 
         services.AddScoped<IAttributeHintResolver, AttributeHintResolver>();
+
+        services.AddOptions<CategoryResolutionOptions>()
+            .Bind(configuration.GetSection("AI:CategoryResolution"))
+            .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<CategoryResolutionOptions>, CategoryResolutionOptionsValidator>();
+
+        services.AddScoped<IGoogleCategoryResolver, GoogleCategoryResolver>();
+        services.AddScoped<ICatalogIntentResolutionOrchestrator, CatalogIntentResolutionOrchestrator>();
 
         return services;
     }
