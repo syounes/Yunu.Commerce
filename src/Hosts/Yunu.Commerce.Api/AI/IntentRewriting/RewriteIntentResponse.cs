@@ -32,7 +32,7 @@ public sealed class RewriteIntentResponse
 
 public sealed class AttributeHintResponse
 {
-    public required string Name { get; init; }
+    public required string RawName { get; init; }
 
-    public string? Value { get; init; }
+    public string? RawValue { get; init; }
 }

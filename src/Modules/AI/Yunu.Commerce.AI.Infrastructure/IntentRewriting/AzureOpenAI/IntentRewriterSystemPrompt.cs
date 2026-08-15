@@ -29,7 +29,11 @@ internal static class IntentRewriterSystemPrompt
         - Corrija apenas erros ortográficos e normalize a consulta para o português
           do Brasil (pt-BR), mantendo o significado original.
         - Separe claramente a categoria sugerida (categoryHint) dos atributos
-          extraídos (attributeHints).
+          extraídos (attributeHints). Cada item de attributeHints deve conter
+          apenas rawName (nome do atributo como percebido no texto) e rawValue
+          (valor como percebido no texto, ou null quando não houver valor).
+          rawName e rawValue são apenas texto interpretado; nunca IDs, códigos
+          ou nomes oficiais do catálogo.
         - Gere uma consulta semântica curta e concisa (semanticQuery), adequada para
           busca por embeddings.
         - Gere uma lista de termos úteis para busca lexical/BM25 (searchTerms).

@@ -7,6 +7,7 @@ using Yunu.Commerce.Api.GoogleTaxonomy;
 using Yunu.Commerce.Api.AttributeEmbeddings;
 using Yunu.Commerce.Api.AI;
 using Yunu.Commerce.Api.AI.IntentRewriting;
+using Yunu.Commerce.Api.AI.AttributeResolution;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -31,7 +32,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddYunuObservability("Yunu.Commerce.Api");
 
 builder.Services
-    .AddCatalogApplication()
+    .AddCatalogApplication(builder.Configuration)
     .AddSellersApplication()
     .AddOffersApplication()
     .AddPricingApplication()
@@ -78,5 +79,6 @@ app.MapCatalogGoogleTaxonomyEndpoints();
 app.MapCatalogAttributeEmbeddingEndpoints();
 app.MapAIEmbeddingsEndpoints();
 app.MapIntentRewritingEndpoints();
+app.MapResolveAttributeHintsEndpoints();
 
 app.Run();

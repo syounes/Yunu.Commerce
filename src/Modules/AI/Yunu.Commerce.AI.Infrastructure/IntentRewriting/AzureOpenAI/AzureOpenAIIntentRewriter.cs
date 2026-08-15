@@ -153,7 +153,7 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
             TargetLocale: request.Locale,
             CategoryHint: modelResponse.CategoryHint,
             AttributeHints: modelResponse.AttributeHints
-                .Select(h => new AttributeHint(h.Name, h.Value))
+                .Select(h => new AttributeHint(h.RawName, h.RawValue))
                 .ToArray(),
             SearchTerms: modelResponse.SearchTerms.ToArray(),
             Confidence: Math.Clamp(modelResponse.Confidence, 0m, 1m));

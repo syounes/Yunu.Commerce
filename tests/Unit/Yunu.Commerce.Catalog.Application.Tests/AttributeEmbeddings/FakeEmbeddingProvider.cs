@@ -13,10 +13,12 @@ internal sealed class FakeEmbeddingProvider : IEmbeddingProvider
     public const string ModelName = "fake-model";
 
     private readonly int _dimensions;
+    private readonly string _modelName;
 
-    public FakeEmbeddingProvider(int dimensions = 1536)
+    public FakeEmbeddingProvider(int dimensions = 1536, string? modelName = null)
     {
         _dimensions = dimensions;
+        _modelName = modelName ?? ModelName;
     }
 
     public string Name => ProviderName;
@@ -37,6 +39,6 @@ internal sealed class FakeEmbeddingProvider : IEmbeddingProvider
         var vector = new float[_dimensions];
         vector[0] = text.Length;
 
-        return Task.FromResult(new EmbeddingResult(Name, ModelName, vector));
+        return Task.FromResult(new EmbeddingResult(Name, _modelName, vector));
     }
 }

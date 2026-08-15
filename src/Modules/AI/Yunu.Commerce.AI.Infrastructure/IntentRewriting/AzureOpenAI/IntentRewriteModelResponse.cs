@@ -39,9 +39,9 @@ internal sealed class IntentRewriteModelResponse
 
 internal sealed class IntentRewriteModelAttributeHint
 {
-    [JsonPropertyName("name")]
-    public string Name { get; init; } = string.Empty;
+    [JsonPropertyName("rawName")]
+    public string RawName { get; init; } = string.Empty;
 
-    [JsonPropertyName("value")]
-    public string? Value { get; init; }
+    [JsonPropertyName("rawValue")]
+    public string? RawValue { get; init; }
 }

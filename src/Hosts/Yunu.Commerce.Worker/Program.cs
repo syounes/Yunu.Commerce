@@ -26,7 +26,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddYunuObservability("Yunu.Commerce.Worker");
 
 builder.Services
-    .AddCatalogApplication()
+    .AddCatalogApplication(builder.Configuration)
     .AddSellersApplication()
     .AddOffersApplication()
     .AddPricingApplication()

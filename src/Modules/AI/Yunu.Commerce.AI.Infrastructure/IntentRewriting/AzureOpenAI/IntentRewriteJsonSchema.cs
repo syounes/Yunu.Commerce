@@ -22,10 +22,10 @@ internal static class IntentRewriteJsonSchema
             ["additionalProperties"] = false,
             ["properties"] = new JsonObject
             {
-                ["name"] = new JsonObject { ["type"] = "string" },
-                ["value"] = new JsonObject { ["type"] = new JsonArray("string", "null") }
+                ["rawName"] = new JsonObject { ["type"] = "string" },
+                ["rawValue"] = new JsonObject { ["type"] = new JsonArray("string", "null") }
             },
-            ["required"] = new JsonArray("name", "value")
+            ["required"] = new JsonArray("rawName", "rawValue")
         };
 
         var schema = new JsonObject

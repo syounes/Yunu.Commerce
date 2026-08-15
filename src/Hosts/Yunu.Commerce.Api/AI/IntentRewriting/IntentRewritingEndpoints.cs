@@ -64,7 +64,7 @@ public static class IntentRewritingEndpoints
                 TargetLocale = result.TargetLocale,
                 CategoryHint = result.CategoryHint,
                 AttributeHints = result.AttributeHints
-                    .Select(h => new AttributeHintResponse { Name = h.Name, Value = h.Value })
+                    .Select(h => new AttributeHintResponse { RawName = h.RawName, RawValue = h.RawValue })
                     .ToArray(),
                 SearchTerms = result.SearchTerms,
                 Confidence = result.Confidence

@@ -21,8 +21,8 @@ public sealed class IntentRewriteModelResponseTests
               "detectedLanguage": "pt",
               "categoryHint": "Tênis para corrida",
               "attributeHints": [
-                { "name": "gênero", "value": "masculino" },
-                { "name": "marca", "value": "Nike" }
+                { "rawName": "gênero", "rawValue": "masculino" },
+                { "rawName": "marca", "rawValue": "Nike" }
               ],
               "searchTerms": ["tênis", "masculino", "Nike"],
               "confidence": 0.96
@@ -33,7 +33,7 @@ public sealed class IntentRewriteModelResponseTests
 
         Assert.Equal("ProductCreation", result.Intent);
         Assert.Equal(2, result.AttributeHints.Count);
-        Assert.Equal("Nike", result.AttributeHints[1].Value);
+        Assert.Equal("Nike", result.AttributeHints[1].RawValue);
         Assert.Equal(0.96m, result.Confidence);
     }
 

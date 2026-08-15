@@ -7,4 +7,4 @@
 /// AttributeDefinition/AttributeOption identifiers is a later retrieval
 /// concern (SQL Server / pgvector), not the LLM's responsibility.
 /// </summary>
-public sealed record AttributeHint(string Name, string? Value);
+public sealed record AttributeHint(string RawName, string? RawValue);

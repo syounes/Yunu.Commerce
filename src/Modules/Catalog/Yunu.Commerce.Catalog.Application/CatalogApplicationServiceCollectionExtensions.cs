@@ -1,5 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
+using Yunu.Commerce.Catalog.Application.AttributeResolution;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
@@ -18,7 +21,7 @@ namespace Yunu.Commerce.Catalog.Application;
 /// </summary>
 public static class CatalogApplicationServiceCollectionExtensions
 {
-    public static IServiceCollection AddCatalogApplication(this IServiceCollection services)
+    public static IServiceCollection AddCatalogApplication(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<GetProductByIdHandler>();
@@ -30,6 +33,14 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GenerateGoogleTaxonomyEmbeddingHandler>();
         services.AddScoped<SynchronizeGoogleTaxonomyEmbeddingsHandler>();
         services.AddScoped<SynchronizeAttributeEmbeddingsHandler>();
+
+        services.AddOptions<AttributeResolutionOptions>()
+            .Bind(configuration.GetSection("AI:AttributeResolution"))
+            .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<AttributeResolutionOptions>, AttributeResolutionOptionsValidator>();
+
+        services.AddScoped<IAttributeHintResolver, AttributeHintResolver>();
 
         return services;
     }

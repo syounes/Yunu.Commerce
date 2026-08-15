@@ -59,7 +59,7 @@ public sealed class IntentRewriteContractTests
             new IntentRewriteRequest("quero cadastrar um tenis masculino preto nike tamanho 41 para corrida"));
 
         Assert.Equal(CatalogIntent.ProductCreation, result.Intent);
-        Assert.Contains(result.AttributeHints, h => h.Name == "marca" && h.Value == "Nike");
+        Assert.Contains(result.AttributeHints, h => h.RawName == "marca" && h.RawValue == "Nike");
         Assert.InRange(result.Confidence, 0m, 1m);
     }
 
