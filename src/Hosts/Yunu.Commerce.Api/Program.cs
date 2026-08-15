@@ -6,6 +6,7 @@ using Yunu.Commerce.Api.Skus;
 using Yunu.Commerce.Api.GoogleTaxonomy;
 using Yunu.Commerce.Api.AttributeEmbeddings;
 using Yunu.Commerce.Api.AI;
+using Yunu.Commerce.Api.AI.IntentRewriting;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -76,5 +77,6 @@ app.MapCatalogSkuEndpoints();
 app.MapCatalogGoogleTaxonomyEndpoints();
 app.MapCatalogAttributeEmbeddingEndpoints();
 app.MapAIEmbeddingsEndpoints();
+app.MapIntentRewritingEndpoints();
 
 app.Run();

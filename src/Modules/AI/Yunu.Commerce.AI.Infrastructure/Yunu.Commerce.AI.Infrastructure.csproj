@@ -1,8 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- shared compilation settings inherited from Directory.Build.props -->
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yunu.Commerce.AI.Infrastructure.Tests" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../Yunu.Commerce.AI.Application/Yunu.Commerce.AI.Application.csproj" />
