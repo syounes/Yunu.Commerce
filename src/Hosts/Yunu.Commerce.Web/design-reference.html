@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YUNU Commerce AI — Referência visual</title>
+  <link rel="stylesheet" href="src/styles/yunu-commerce.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-lockup"><div class="brand-mark"><span>Y</span></div><div><strong>YUNU</strong><span>Commerce AI</span></div></div>
+      <div class="topbar-actions"><div class="connection-pill"><span class="pulse-dot"></span>API conectada</div><button class="icon-button">◌</button><div class="avatar">SY</div></div>
+    </header>
+
+    <div class="workspace">
+      <aside class="rail">
+        <button class="rail-button active">✦</button><button class="rail-button">◇</button><button class="rail-button">↻</button><div class="rail-spacer"></div><button class="rail-button">⚙</button>
+      </aside>
+
+      <section class="content">
+        <div class="page-heading">
+          <div><p class="eyebrow">CATÁLOGO INTELIGENTE</p><h1>Crie produtos conversando.</h1><p class="subtitle">Descreva o produto do seu jeito. A YUNU interpreta, classifica e prepara tudo para sua revisão.</p></div>
+          <div class="environment-badge"><span>LAB</span><strong>pt-BR</strong></div>
+        </div>
+
+        <section class="chat-card">
+          <div class="chat-header"><div class="assistant-identity"><div class="assistant-avatar">✦</div><div><strong>YUNU Catalog</strong><span>Assistente de criação de produtos</span></div></div><span class="model-pill">RAG ativo</span></div>
+          <div class="conversation">
+            <div class="message assistant-message"><div class="mini-avatar">✦</div><div class="bubble"><p>Olá, Sulaiman. Qual produto vamos cadastrar hoje?</p><span>Inclua características, condição e dados da embalagem. Eu organizo o restante.</span></div></div>
+            <div class="message user-message"><div class="bubble"><p>Quero cadastrar um microfone condensador USB preto, novo, com corpo em alumínio e embalagem de 25 × 15 × 10 cm.</p></div></div>
+          </div>
+          <div class="composer">
+            <label for="product-intent">Descreva o produto</label>
+            <textarea id="product-intent" maxlength="2000">Quero cadastrar um microfone condensador com conexão USB, na cor preta, corpo fabricado em alumínio e condição novo.</textarea>
+            <div class="composer-footer"><div class="composer-meta"><button class="attach-button">＋</button><span>147/2000</span><span class="shortcut">Ctrl ↵ para enviar</span></div><button class="primary-button">Gerar proposta <span>→</span></button></div>
+          </div>
+        </section>
+
+        <section class="proposal-area">
+          <div class="result-heading"><div><span class="success-icon">✓</span><div><h2>Proposta pronta para revisão</h2><p>Categoria e 10 atributos resolvidos com sucesso.</p></div></div><div class="proposal-id"><span>ID DA PROPOSTA</span><code>cf0bc3a3…c3878</code></div></div>
+
+          <article class="entity-card product-card">
+            <div class="card-accent product-accent"></div>
+            <div class="entity-header"><div class="entity-title"><div class="entity-icon product-icon">◇</div><div><div class="label-row"><span class="entity-label">PRODUTO</span><span class="status-pill">Aguardando revisão</span></div><h3>Microfone condensador USB</h3><p>Corpo em alumínio para podcasts e gravações em estúdio.</p></div></div><button class="secondary-button">Editar detalhes</button></div>
+            <div class="classification-box"><div class="taxonomy-mark">G</div><div class="classification-main"><span>CATEGORIA GOOGLE</span><strong>Microfones</strong><p>Eletrônicos <b>›</b> Áudio <b>›</b> Componentes para equipamentos de áudio <b>›</b> Microfones</p></div><div class="classification-stats"><div><span>ID</span><strong>234</strong></div><div><span>ESTRATÉGIA</span><strong>Exact match</strong></div><div><span>CONFIANÇA</span><strong class="confidence">100%</strong></div></div></div>
+            <div class="metadata-row"><div><span>Marca</span><strong>A definir</strong></div><div><span>Família</span><strong>A definir</strong></div><div><span>Idioma</span><strong>Português (Brasil)</strong></div><div><span>Criado em</span><strong>16 ago 2026 · 16:43</strong></div></div>
+          </article>
+
+          <article class="entity-card sku-card">
+            <div class="card-accent sku-accent"></div>
+            <div class="entity-header"><div class="entity-title"><div class="entity-icon sku-icon">▦</div><div><div class="label-row"><span class="entity-label">SKU 01</span><span class="resolved-pill"><i></i>10 atributos resolvidos</span></div><h3>Variação principal</h3><p>Código e GTIN poderão ser informados durante a revisão.</p></div></div><button class="secondary-button">Editar SKU</button></div>
+            <div class="sku-identifiers"><div><span>CÓDIGO DO SKU</span><strong>A definir</strong></div><div><span>GTIN</span><strong>Não informado</strong></div><div><span>ID INTERNO DA PROPOSTA</span><code>7e8cae4b…ea12</code></div></div>
+            <div class="attributes-section"><div class="section-title"><h4>Atributos do SKU</h4><span>Todos validados</span></div><div class="attribute-grid" id="attribute-grid"></div></div>
+          </article>
+
+          <div class="review-bar"><div><span class="review-mark">✦</span><div><strong>Tudo certo com a proposta?</strong><p>Revise os dados antes de criar o produto definitivo.</p></div></div><div class="review-actions"><button class="secondary-button">Salvar para depois</button><button class="confirm-button" disabled>Confirmar e criar produto <span>→</span></button></div></div>
+        </section>
+        <footer><span>YUNU Commerce AI</span><p>Uma intenção. Um catálogo completo.</p></footer>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const attributes = [["Tipo","Condensador","text"],["Conexão","USB","enum"],["Cor","Preta","text"],["Material","Alumínio","text"],["Condição","Novo","enum"],["Uso indicado","Podcasts e estúdio","text"],["Peso para frete","850 g","measure"],["Comprimento","25 cm","measure"],["Largura","15 cm","measure"],["Altura","10 cm","measure"]];
+    document.querySelector("#attribute-grid").innerHTML = attributes.map(([label,value,kind]) => `<div class="attribute-item"><div class="attribute-kind ${kind}">${kind === "enum" ? "⌄" : kind === "measure" ? "↔" : "Aa"}</div><div><span>${label}</span><strong>${value}</strong></div><i class="attribute-check">✓</i></div>`).join("");
+  </script>
+</body>
+</html>

@@ -63,6 +63,19 @@ builder.Services.AddHealthChecks();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+const string YunuWebCorsPolicy = "YunuWebCorsPolicy";
+var yunuWebOrigins = builder.Configuration
+    .GetSection("Cors:YunuWebOrigins")
+    .Get<string[]>() ?? ["http://localhost:5173", "https://localhost:5173"];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(YunuWebCorsPolicy, policy => policy
+        .WithOrigins(yunuWebOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -70,6 +83,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseCors(YunuWebCorsPolicy);
 
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
