@@ -376,21 +376,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             };
         }
 
-        if (rerankResult.Ranking.Count > 1)
-        {
-            var orderedRanking = rerankResult.Ranking.OrderByDescending(r => r.RelevanceScore).ToArray();
-            var margin = orderedRanking[0].RelevanceScore - orderedRanking[1].RelevanceScore;
-
-            if (margin < _rerankingOptions.MinimumScoreMargin)
-            {
-                return AmbiguousResult(hint, candidateDtos, "Reranker relevance scores are too close to safely disambiguate.") with
-                {
-                    DefinitionStrategy = ResolutionStrategy.Reranked,
-                    DefinitionRerankConfidence = rerankResult.Confidence,
-                    DefinitionRerankReason = rerankResult.Reason
-                };
-            }
-        }
+        // Note: ambiguity/ties are the reranker's own responsibility to
+        // declare via Decision == Ambiguous (handled above). An explicit
+        // Selected decision with sufficient Confidence must not be silently
+        // overridden by independently recomputing a margin over the raw
+        // Ranking relevance scores; doing so previously caused a correct,
+        // high-confidence reranker selection (e.g. "estado = novo" -> Condição
+        // at 0.9 confidence) to be downgraded to Ambiguous.
 
         var resolvedDefinition = hydratedByCode[selectedCandidate.AttributeCode];
 

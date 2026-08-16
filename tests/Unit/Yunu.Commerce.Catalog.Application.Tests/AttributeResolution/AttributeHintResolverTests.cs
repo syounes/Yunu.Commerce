@@ -33,7 +33,7 @@ public sealed class AttributeHintResolverTests
             double minimumScoreMargin = 0.05,
             int topK = 5,
             bool alwaysRerankSemanticMatches = false,
-            FakeCandidateReranker? reranker = null)
+            ICandidateReranker? reranker = null)
     {
         var catalogReader = new FakeAttributeCatalogReader();
         var semanticSearch = new FakeAttributeSemanticSearch();
@@ -387,6 +387,204 @@ public sealed class AttributeHintResolverTests
 
         var resolved = Assert.Single(result.Attributes);
         Assert.Equal(AttributeResolutionStatus.Ambiguous, resolved.Status);
+    }
+
+    [Fact]
+    public async Task Adding_a_new_definition_does_not_push_a_previously_resolvable_definition_out_of_TopK()
+    {        // Regression: adding "connection_type" to the catalog introduced a
+        // new semantic candidate that scored higher than several existing
+        // ones for unrelated hints (e.g. "tipo = condensador"), pushing
+        // "feature" (previously the 5th-ranked candidate at ~0.4377) out of
+        // a TopK=5 window and causing a false NotFound. TopK must be large
+        // enough (10) that a new definition entering the top scores does not
+        // silently evict a still-valid lower-ranked candidate before
+        // reranking. Reranker candidates are unbounded by TopK=5 alone since
+        // MaximumCandidates=10 already allows up to 10 through.
+        var reranker = FakeCandidateReranker.Returning(
+            new CandidateRerankResult(CandidateRerankDecision.Selected, 4, 0.9, [], "feature is the best match"));
+
+        var (resolver, catalogReader, semanticSearch, _) = CreateSut(
+            definitionMinimumSimilarity: 0.30,
+            topK: 10,
+            alwaysRerankSemanticMatches: true,
+            reranker: reranker);
+
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            68, "feature", "Característica", null, "Text", "Multiple", null, null, null, null, null, true));
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            69, "connection_type", "Tipo de conexão", null, "Enum", "Multiple", null, null, null, null, null, true));
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            70, "candidate_a", "Candidato A", null, "Text", "Single", null, null, null, null, null, true));
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            71, "candidate_b", "Candidato B", null, "Text", "Single", null, null, null, null, null, true));
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            72, "candidate_c", "Candidato C", null, "Text", "Single", null, null, null, null, null, true));
+
+        // "connection_type" now outranks several previously-established
+        // candidates for this unrelated hint, exactly as observed in
+        // production after its introduction.
+        semanticSearch.AddDefinitionCandidate("connection_type", "Tipo de conexão", 0.5067);
+        semanticSearch.AddDefinitionCandidate("candidate_a", "Candidato A", 0.48);
+        semanticSearch.AddDefinitionCandidate("candidate_b", "Candidato B", 0.46);
+        semanticSearch.AddDefinitionCandidate("candidate_c", "Candidato C", 0.45);
+        semanticSearch.AddDefinitionCandidate("feature", "Característica", 0.4377);
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("tipo", "condensador")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("feature", resolved.AttributeCode);
+    }
+
+    [Fact]
+    public async Task Explicit_high_confidence_reranker_selection_is_not_overridden_by_relevance_score_margin()
+    {
+        // Regression: "estado = novo" resolved condition as the top vector
+        // candidate; the reranker explicitly selected it (Decision=Selected)
+        // with Confidence=0.9 and a Reason affirming it was the correct
+        // attribute, yet the final status was incorrectly downgraded to
+        // Ambiguous because the *raw* Ranking relevance scores (unrelated to
+        // Decision/Confidence) were too close together. An explicit,
+        // sufficiently confident reranker selection must not be second-
+        // guessed by that raw score margin; only Decision == Ambiguous or
+        // Confidence below the configured minimum may produce Ambiguous.
+        var reranker = FakeCandidateReranker.Returning(
+            new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                0,
+                0.9,
+                [new RerankedCandidateScore(0, 0.51), new RerankedCandidateScore(1, 0.50)],
+                "Condição é o atributo correto para 'estado'."));
+
+        var (resolver, catalogReader, semanticSearch, _) = CreateSut(
+            definitionMinimumSimilarity: 0.30,
+            alwaysRerankSemanticMatches: true,
+            reranker: reranker);
+
+        catalogReader.AddDefinition(ConditionDefinition());
+        catalogReader.AddOption(new AttributeOptionCatalogEntry(1201, 23, "NEW", "new", "Novo", true));
+
+        semanticSearch.AddDefinitionCandidate("condition", "Condição", 0.55);
+        semanticSearch.AddDefinitionCandidate("size", "Tamanho", 0.40);
+        semanticSearch.AddOptionCandidate("condition", "NEW", "Novo", 0.95);
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("estado", "novo")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("condition", resolved.AttributeCode);
+        Assert.Equal("NEW", resolved.OptionCode);
+    }
+
+    [Fact]
+    public async Task Combined_regression_ConditionFeatureAndConnectionType_AllResolvedAndReadyForProposal()
+    {
+        // End-to-end regression covering the three cases that must all keep
+        // working together: (1) "estado = novo" resolved via an explicit,
+        // high-confidence reranker Selected decision that must not be
+        // downgraded to Ambiguous by the raw relevance-score margin check;
+        // (2) "tipo = condensador" resolved to "feature" despite
+        // "connection_type" now outranking it at TopK=10; (3) "tipo de
+        // conexão = USB" resolved to connection_type/USB.
+        var reranker = new DynamicFakeReranker(request =>
+        {
+            if (request.Query == "estado")
+            {
+                return new CandidateRerankResult(
+                    CandidateRerankDecision.Selected, 0, 0.9,
+                    [new RerankedCandidateScore(0, 0.51), new RerankedCandidateScore(1, 0.50)],
+                    "Condição é o atributo correto para 'estado'.");
+            }
+
+            if (request.Query == "novo")
+            {
+                return new CandidateRerankResult(
+                    CandidateRerankDecision.Selected, 0, 0.9,
+                    [new RerankedCandidateScore(0, 0.51), new RerankedCandidateScore(1, 0.50)],
+                    "NEW é a opção correta para 'novo'.");
+            }
+
+            if (request.Query == "tipo")
+            {
+                var featureIndex = request.Candidates
+                    .First(c => c.DisplayText == "Característica")
+                    .Index;
+
+                return new CandidateRerankResult(
+                    CandidateRerankDecision.Selected, featureIndex, 0.9, [],
+                    "Característica é o atributo correto para 'tipo'.");
+            }
+
+            if (request.Query == "tipo de conexão")
+            {
+                return new CandidateRerankResult(
+                    CandidateRerankDecision.Selected, 0, 0.9, [],
+                    "Tipo de conexão é o atributo correto.");
+            }
+
+            if (request.Query == "USB")
+            {
+                return new CandidateRerankResult(
+                    CandidateRerankDecision.Selected, 0, 0.9, [],
+                    "USB é a opção correta.");
+            }
+
+            return new CandidateRerankResult(CandidateRerankDecision.None, null, 0, [], "unexpected query");
+        });
+
+        var (resolver, catalogReader, semanticSearch, _) = CreateSut(
+            definitionMinimumSimilarity: 0.30,
+            topK: 10,
+            alwaysRerankSemanticMatches: true,
+            reranker: reranker);
+
+        // condition / NEW
+        catalogReader.AddDefinition(ConditionDefinition());
+        catalogReader.AddOption(new AttributeOptionCatalogEntry(1201, 23, "NEW", "new", "Novo", true));
+        semanticSearch.AddDefinitionCandidate("condition", "Condição", 0.55);
+        semanticSearch.AddDefinitionCandidate("size", "Tamanho", 0.40);
+        semanticSearch.AddOptionCandidate("condition", "NEW", "Novo", 0.95);
+
+        // feature (must survive connection_type outranking it)
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            68, "feature", "Característica", null, "Text", "Multiple", null, null, null, null, null, true));
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            69, "connection_type", "Tipo de conexão", null, "Enum", "Multiple", null, null, null, null, null, true));
+        catalogReader.AddOption(new AttributeOptionCatalogEntry(1901, 69, "USB", "USB", "USB", true));
+        semanticSearch.AddDefinitionCandidate("connection_type", "Tipo de conexão", 0.5067);
+        semanticSearch.AddDefinitionCandidate("feature", "Característica", 0.4377);
+        semanticSearch.AddOptionCandidate("connection_type", "USB", "USB", 0.95);
+
+        var request = new ResolveAttributeHintsRequest(
+        [
+            new AttributeHint("estado", "novo"),
+            new AttributeHint("tipo", "condensador"),
+            new AttributeHint("tipo de conexão", "USB")
+        ]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Equal(3, result.Attributes.Count);
+
+        var condition = result.Attributes.Single(a => a.RawName == "estado");
+        Assert.Equal(AttributeResolutionStatus.Resolved, condition.Status);
+        Assert.Equal("condition", condition.AttributeCode);
+        Assert.Equal("NEW", condition.OptionCode);
+
+        var tipo = result.Attributes.Single(a => a.RawName == "tipo");
+        Assert.Equal(AttributeResolutionStatus.Resolved, tipo.Status);
+        Assert.Equal("feature", tipo.AttributeCode);
+
+        var connection = result.Attributes.Single(a => a.RawName == "tipo de conexão");
+        Assert.Equal(AttributeResolutionStatus.Resolved, connection.Status);
+        Assert.Equal("connection_type", connection.AttributeCode);
+        Assert.Equal("USB", connection.OptionCode);
+
+        Assert.True(result.AllResolved);
     }
 
     [Fact]
@@ -839,4 +1037,25 @@ public sealed class AttributeHintResolverTests
         Assert.Equal("2 kg", resolved.NormalizedValue);
         Assert.True(result.AllResolved);
     }
+}
+
+/// <summary>
+/// Test-only fake for ICandidateReranker that computes its result from the
+/// incoming request (docs task: "Contextual candidate reranking"), used when
+/// a single test exercises multiple hints that each need a different
+/// reranking outcome (e.g. combined regression scenarios).
+/// </summary>
+internal sealed class DynamicFakeReranker : Yunu.Commerce.AI.Application.Reranking.ICandidateReranker
+{
+    private readonly Func<Yunu.Commerce.AI.Application.Reranking.CandidateRerankRequest, Yunu.Commerce.AI.Application.Reranking.CandidateRerankResult> _resolve;
+
+    public DynamicFakeReranker(Func<Yunu.Commerce.AI.Application.Reranking.CandidateRerankRequest, Yunu.Commerce.AI.Application.Reranking.CandidateRerankResult> resolve)
+    {
+        _resolve = resolve;
+    }
+
+    public Task<Yunu.Commerce.AI.Application.Reranking.CandidateRerankResult> RerankAsync(
+        Yunu.Commerce.AI.Application.Reranking.CandidateRerankRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(_resolve(request));
 }
