@@ -23,6 +23,8 @@ public sealed class RewriteIntentResponse
 
     public string? CategoryHint { get; init; }
 
+    public string? CategorySearchQuery { get; init; }
+
     public IReadOnlyList<AttributeHintResponse> AttributeHints { get; init; } = Array.Empty<AttributeHintResponse>();
 
     public IReadOnlyList<string> SearchTerms { get; init; } = Array.Empty<string>();

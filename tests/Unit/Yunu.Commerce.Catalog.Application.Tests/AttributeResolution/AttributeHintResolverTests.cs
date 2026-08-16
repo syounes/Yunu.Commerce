@@ -504,4 +504,339 @@ public sealed class AttributeHintResolverTests
         Assert.Equal(2, result.Attributes.Count);
         Assert.All(result.Attributes, a => Assert.Equal(AttributeResolutionStatus.Resolved, a.Status));
     }
+
+    private static AttributeDefinitionCatalogEntry ShippingWeightDefinition() => new(
+        AttributeDefinitionId: 37,
+        Code: "shipping_weight",
+        Name: "Peso para frete",
+        GoogleAttributeName: null,
+        DataType: "Measurement",
+        Cardinality: "Single",
+        UnitFamily: "Weight",
+        ValidationRegex: null,
+        MinNumericValue: 0,
+        MaxNumericValue: null,
+        MaxLength: null,
+        IsActive: true);
+
+    [Theory]
+    [InlineData("2 kg", 2, "kg")]
+    [InlineData("2kg", 2, "kg")]
+    [InlineData("2,5 kg", 2.5, "kg")]
+    [InlineData("2.5 kg", 2.5, "kg")]
+    [InlineData("500 g", 500, "g")]
+    public async Task Measurement_hint_preserves_typed_value_and_normalized_display(string rawValue, decimal expectedValue, string expectedUnit)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("shipping_weight", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal($"{expectedValue} {expectedUnit}", resolved.NormalizedValue);
+        Assert.NotNull(resolved.TypedValue);
+        Assert.Equal(expectedValue, resolved.TypedValue!.MeasurementValue);
+        Assert.Equal(expectedUnit, resolved.TypedValue.UnitCode);
+        Assert.True(result.AllResolved);
+    }
+
+    [Theory]
+    [InlineData("1,75 m", 1.75, "m")]
+    [InlineData("150 cm", 150, "cm")]
+    public async Task Measurement_length_hint_preserves_typed_value(string rawValue, decimal expectedValue, string expectedUnit)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            34, "product_length", "Comprimento do produto", null, "Measurement", "Single", "Length", null, 0, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("product_length", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(expectedValue, resolved.TypedValue!.MeasurementValue);
+        Assert.Equal(expectedUnit, resolved.TypedValue.UnitCode);
+    }
+
+    [Theory]
+    [InlineData("250 ml", 250, "ml")]
+    [InlineData("1 L", 1, "l")]
+    public async Task Measurement_volume_hint_preserves_typed_value(string rawValue, decimal expectedValue, string expectedUnit)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            22, "capacity", "Capacidade", null, "Measurement", "Single", "Volume", null, 0, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("capacity", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(expectedValue, resolved.TypedValue!.MeasurementValue);
+        Assert.Equal(expectedUnit, resolved.TypedValue.UnitCode);
+    }
+
+    [Theory]
+    [InlineData("2 quilos", 2, "kg")]
+    [InlineData("500 gramas", 500, "g")]
+    public async Task Measurement_alias_is_normalized_to_canonical_unit_code(string rawValue, decimal expectedValue, string expectedUnit)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("shipping_weight", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(expectedUnit, resolved.TypedValue!.UnitCode);
+        Assert.Equal(expectedValue, resolved.TypedValue.MeasurementValue);
+    }
+
+    [Fact]
+    public async Task Measurement_alias_litro_is_normalized_to_l()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            22, "capacity", "Capacidade", null, "Measurement", "Single", "Volume", null, 0, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("capacity", "1 litro")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("l", resolved.TypedValue!.UnitCode);
+        Assert.Equal(1, resolved.TypedValue.MeasurementValue);
+    }
+
+    [Fact]
+    public async Task Measurement_with_incompatible_unit_family_is_InvalidValue()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("shipping_weight", "2 cm")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+        Assert.Contains("incompatible with UnitFamily", resolved.Reason);
+        Assert.Null(resolved.TypedValue);
+        Assert.False(result.AllResolved);
+    }
+
+    [Fact]
+    public async Task Measurement_without_unit_is_InvalidValue()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("shipping_weight", "2")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+        Assert.Contains("unit is required", resolved.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.AllResolved);
+    }
+
+    [Fact]
+    public async Task Measurement_with_invalid_number_is_InvalidValue()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("shipping_weight", "dois kg")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+    }
+
+    [Theory]
+    [InlineData("R$ 199,90", 199.90, "BRL")]
+    [InlineData("BRL 199.90", 199.90, "BRL")]
+    [InlineData("199,90 BRL", 199.90, "BRL")]
+    [InlineData("US$ 50.00", 50.00, "USD")]
+    [InlineData("USD 50", 50, "USD")]
+    public async Task Money_hint_preserves_typed_amount_and_currency(string rawValue, decimal expectedAmount, string expectedCurrency)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            26, "price", "Preço", null, "Money", "Single", null, null, 0, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("price", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(expectedAmount, resolved.TypedValue!.MoneyAmount);
+        Assert.Equal(expectedCurrency, resolved.TypedValue.CurrencyCode);
+    }
+
+    [Theory]
+    [InlineData("sim", true)]
+    [InlineData("true", true)]
+    [InlineData("verdadeiro", true)]
+    [InlineData("1", true)]
+    [InlineData("não", false)]
+    [InlineData("nao", false)]
+    [InlineData("false", false)]
+    [InlineData("falso", false)]
+    [InlineData("0", false)]
+    public async Task Boolean_hint_preserves_typed_value(string rawValue, bool expected)
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            31, "is_bundle", "É kit", null, "Boolean", "Single", null, null, null, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("is_bundle", rawValue)]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(expected, resolved.TypedValue!.BooleanValue);
+    }
+
+    [Fact]
+    public async Task Decimal_hint_accepts_comma_and_dot()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            60, "popularity_rank", "Popularidade", null, "Decimal", "Single", null, null, 0, 100, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("popularity_rank", "2,5")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal(2.5m, resolved.TypedValue!.DecimalValue);
+    }
+
+    [Fact]
+    public async Task Integer_hint_rejects_fractional_value()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            41, "min_handling_time", "Prazo mínimo de manuseio", null, "Integer", "Single", null, null, 0, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("min_handling_time", "2,5")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+    }
+
+    [Fact]
+    public async Task DateTime_hint_preserves_typed_value_from_iso()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            25, "availability_date", "Data de disponibilidade", null, "DateTime", "Single", null, null, null, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("availability_date", "2026-08-20")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.TypedValue!.DateTimeValue);
+    }
+
+    [Fact]
+    public async Task Json_hint_valid_is_resolved_with_typed_value()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            13, "product_detail", "Detalhe técnico", null, "Json", "Multiple", null, null, null, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("product_detail", "{\"key\":\"value\"}")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("{\"key\":\"value\"}", resolved.TypedValue!.JsonValue);
+    }
+
+    [Fact]
+    public async Task Json_hint_invalid_is_InvalidValue()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            13, "product_detail", "Detalhe técnico", null, "Json", "Multiple", null, null, null, null, null, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("product_detail", "{not valid json")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+    }
+
+    [Fact]
+    public async Task Url_hint_valid_is_resolved()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            8, "link", "Link do produto", null, "Url", "Single", null, null, null, null, 2048, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("link", "https://example.com/p/1")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("https://example.com/p/1", resolved.TypedValue!.TextValue);
+    }
+
+    [Fact]
+    public async Task Url_hint_invalid_is_InvalidValue()
+    {
+        var (resolver, catalogReader, _, _) = CreateSut();
+        catalogReader.AddDefinition(new AttributeDefinitionCatalogEntry(
+            8, "link", "Link do produto", null, "Url", "Single", null, null, null, null, 2048, true));
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("link", "not a url")]);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.InvalidValue, resolved.Status);
+    }
+
+    [Fact]
+    public async Task Regression_peso_para_entrega_2kg_resolves_shipping_weight_with_typed_value()
+    {
+        var (resolver, catalogReader, semanticSearch, _) = CreateSut();
+        catalogReader.AddDefinition(ShippingWeightDefinition());
+
+        semanticSearch.AddDefinitionCandidate("shipping_weight", "Peso para frete", 0.91);
+
+        var request = new ResolveAttributeHintsRequest([new AttributeHint("peso para entrega", "2 kg")], GoogleCategoryId: 187);
+
+        var result = await resolver.ResolveAsync(request, CancellationToken.None);
+
+        var resolved = Assert.Single(result.Attributes);
+        Assert.Equal(AttributeResolutionStatus.Resolved, resolved.Status);
+        Assert.Equal("shipping_weight", resolved.AttributeCode);
+        Assert.Equal(2, resolved.TypedValue!.MeasurementValue);
+        Assert.Equal("kg", resolved.TypedValue.UnitCode);
+        Assert.Equal("2 kg", resolved.NormalizedValue);
+        Assert.True(result.AllResolved);
+    }
 }

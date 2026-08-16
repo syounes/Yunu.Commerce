@@ -96,6 +96,18 @@ public sealed record ResolvedAttributeHint(
     public ResolutionStrategy? OptionStrategy { get; init; }
 
     /// <summary>
+    /// Typed, structured representation of <see cref="NormalizedValue"/>
+    /// (docs task: "Semantic attribute hint resolution" - typed attribute
+    /// value preservation), populated for resolved non-Enum attributes.
+    /// <see cref="NormalizedValue"/> is always equivalent to
+    /// <c>TypedValue.DisplayValue</c> when this is not null; preserved
+    /// separately for backwards compatibility and display. Enum attributes
+    /// never populate this: their official identity remains
+    /// AttributeOptionId/OptionCode/OptionName.
+    /// </summary>
+    public ResolvedAttributeValue? TypedValue { get; init; }
+
+    /// <summary>
     /// Reranker confidence for the attribute option selection, present only
     /// when <see cref="OptionStrategy"/> is
     /// <see cref="ResolutionStrategy.Reranked"/>. Distinct from

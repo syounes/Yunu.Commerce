@@ -63,7 +63,20 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        if (string.IsNullOrWhiteSpace(request.RawCategoryHint))
+        // The category search query is the disambiguated, taxonomy-aligned
+        // text produced by the Intent Rewriter; RawCategoryHint is only used
+        // as a compatibility fallback for older callers that never supplied
+        // CategorySearchQuery. This prevents an ambiguous hint alone (e.g.
+        // "tênis") from driving exact match or embedding retrieval when a
+        // disambiguated query is available.
+        var effectiveQuery = !string.IsNullOrWhiteSpace(request.CategorySearchQuery)
+            ? request.CategorySearchQuery
+            : request.RawCategoryHint;
+        var querySource = !string.IsNullOrWhiteSpace(request.CategorySearchQuery)
+            ? "CategorySearchQuery"
+            : "RawCategoryHintFallback";
+
+        if (string.IsNullOrWhiteSpace(effectiveQuery))
         {
             return new ResolveGoogleCategoryResult(
                 request.RawCategoryHint,
@@ -78,10 +91,17 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
         // a properly registered Embedding model.
         var resolvedModel = _modelCatalog.Resolve(_options.EmbeddingModel, AIModelType.Embedding);
 
-        // Etapa 1: exact/normalized match in SQL Server.
+        _logger.LogInformation(
+            "Google category resolution query source: {QuerySource}. Locale={Locale}",
+            querySource,
+            request.Locale);
+
+        // Etapa 1: exact/normalized match in SQL Server, using the
+        // disambiguated query when available so an ambiguous raw hint alone
+        // (e.g. "tênis") never short-circuits into the wrong exact match.
         var exactMatchStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var exactMatches = await _catalogReader.FindExactMatchesAsync(
-            request.RawCategoryHint,
+            effectiveQuery,
             request.Locale,
             cancellationToken);
         exactMatchStopwatch.Stop();
@@ -124,11 +144,19 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
                 exactMatches.Count);
         }
 
-        // Etapa 2: semantic search using categoryHint + semanticQuery context.
+        // Etapa 2: semantic search using the effective (disambiguated)
+        // category search query alone. SemanticQuery is deliberately NOT
+        // concatenated here: it stays available as reranker context only, so
+        // it can never dilute or destabilize the category embedding.
         var embeddingStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        var queryText = BuildSemanticCategoryText(request.RawCategoryHint, request.SemanticQuery);
+        var queryText = BuildSemanticCategoryText(effectiveQuery);
         var embeddingResult = await _embeddingOrchestrator.GenerateAsync(queryText, cancellationToken: cancellationToken);
+
+        _logger.LogInformation(
+            "Google category embedding text length={TextLength} source={QuerySource}",
+            queryText.Length,
+            querySource);
 
         ValidateEmbeddingModel(embeddingResult, resolvedModel);
 
@@ -224,7 +252,7 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
 
         var rerankRequest = new CandidateRerankRequest(
             Task: "Select the Google product category that describes what the product is.",
-            Query: request.RawCategoryHint,
+            Query: effectiveQuery,
             Context: request.SemanticQuery,
             Candidates: rerankCandidates,
             Locale: request.Locale);
@@ -416,18 +444,17 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
     }
 
     /// <summary>
-    /// Composes the text sent for embedding: preserves the raw category hint
-    /// and adds the semantic query as product context, so the embedding is
-    /// never generated from a bare generic word alone (e.g. "tênis"). Ignores
-    /// empty context and never invents data; deterministic and testable.
+    /// Composes the text sent for embedding from the effective (already
+    /// disambiguated) category search query alone. SemanticQuery is
+    /// deliberately never concatenated here: mixing broad product context
+    /// back into the category embedding is exactly what previously allowed an
+    /// ambiguous term (e.g. "tênis") to drift towards the wrong candidate;
+    /// SemanticQuery remains available as reranker context instead.
+    /// Deterministic and testable.
     /// </summary>
-    public static string BuildSemanticCategoryText(string rawCategoryHint, string? semanticQuery)
+    public static string BuildSemanticCategoryText(string effectiveQuery)
     {
-        var hint = rawCategoryHint.Trim();
-
-        return string.IsNullOrWhiteSpace(semanticQuery)
-            ? $"Categoria de produto sugerida: {hint}."
-            : $"Categoria de produto sugerida: {hint}. Contexto do produto: {semanticQuery.Trim()}.";
+        return $"Categoria de produto sugerida: {effectiveQuery.Trim()}.";
     }
 
     private static void ValidateEmbeddingModel(EmbeddingResult embeddingResult, ResolvedAIModel resolvedModel)

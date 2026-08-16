@@ -18,8 +18,20 @@ public sealed class IntentRewriteJsonSchemaTests
         var required = schema["required"]!.AsArray().Select(n => n!.GetValue<string>()).ToArray();
 
         Assert.Equal(
-            new[] { "normalizedQuery", "semanticQuery", "intent", "detectedLanguage", "categoryHint", "attributeHints", "searchTerms", "confidence" },
+            new[] { "normalizedQuery", "semanticQuery", "intent", "detectedLanguage", "categoryHint", "categorySearchQuery", "attributeHints", "searchTerms", "confidence" },
             required);
+    }
+
+    [Fact]
+    public void Build_declares_categorySearchQuery_as_nullable_string()
+    {
+        var schema = JsonNode.Parse(IntentRewriteJsonSchema.Build().ToString())!.AsObject();
+
+        var categorySearchQueryTypes = schema["properties"]!["categorySearchQuery"]!["type"]!.AsArray()
+            .Select(n => n!.GetValue<string>())
+            .ToArray();
+
+        Assert.Equal(new[] { "string", "null" }, categorySearchQueryTypes);
     }
 
     [Fact]

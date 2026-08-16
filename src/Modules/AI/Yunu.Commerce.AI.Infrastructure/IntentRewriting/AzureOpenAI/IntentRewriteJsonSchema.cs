@@ -43,6 +43,7 @@ internal static class IntentRewriteJsonSchema
                 },
                 ["detectedLanguage"] = new JsonObject { ["type"] = "string" },
                 ["categoryHint"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
+                ["categorySearchQuery"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
                 ["attributeHints"] = new JsonObject
                 {
                     ["type"] = "array",
@@ -66,6 +67,7 @@ internal static class IntentRewriteJsonSchema
                 "intent",
                 "detectedLanguage",
                 "categoryHint",
+                "categorySearchQuery",
                 "attributeHints",
                 "searchTerms",
                 "confidence")

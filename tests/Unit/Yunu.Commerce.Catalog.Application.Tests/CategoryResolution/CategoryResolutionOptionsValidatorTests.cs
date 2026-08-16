@@ -1,16 +1,30 @@
-﻿using Xunit;
+﻿using Microsoft.Extensions.Options;
+using Xunit;
+using Yunu.Commerce.AI.Application.Reranking;
 using Yunu.Commerce.Catalog.Application.CategoryResolution;
 
 namespace Yunu.Commerce.Catalog.Application.Tests.CategoryResolution;
 
 public sealed class CategoryResolutionOptionsValidatorTests
 {
-    private readonly CategoryResolutionOptionsValidator _validator = new();
+    private static CategoryResolutionOptionsValidator CreateValidator(int maximumCandidates = 10) =>
+        new(Options.Create(new RerankingOptions
+        {
+            Model = "CatalogReranker",
+            MinimumConfidence = 0.75,
+            MinimumScoreMargin = 0.10,
+            MaximumCandidates = maximumCandidates,
+            AlwaysRerankSemanticMatches = true,
+            MaxConcurrentRerankRequests = 4,
+            TechnicalFailureFallback = TechnicalFailureFallbackStrategy.VectorThreshold
+        }));
+
+    private readonly CategoryResolutionOptionsValidator _validator = CreateValidator();
 
     private static CategoryResolutionOptions ValidOptions() => new()
     {
         EmbeddingModel = "CategoryEmbedding",
-        TopK = 5,
+        TopK = 20,
         MinimumSimilarity = 0.70,
         MinimumScoreMargin = 0.03,
         IncludeCandidatesInResponse = true
@@ -109,6 +123,42 @@ public sealed class CategoryResolutionOptionsValidatorTests
         };
 
         var result = _validator.Validate(null, options);
+
+        Assert.False(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_succeeds_when_topK_equals_maximumCandidates()
+    {
+        var validator = CreateValidator(maximumCandidates: 10);
+        var options = new CategoryResolutionOptions
+        {
+            EmbeddingModel = "CategoryEmbedding",
+            TopK = 10,
+            MinimumSimilarity = 0.70,
+            MinimumScoreMargin = 0.03,
+            IncludeCandidatesInResponse = true
+        };
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Succeeded);
+    }
+
+    [Fact]
+    public void Validate_fails_when_topK_is_less_than_maximumCandidates()
+    {
+        var validator = CreateValidator(maximumCandidates: 10);
+        var options = new CategoryResolutionOptions
+        {
+            EmbeddingModel = "CategoryEmbedding",
+            TopK = 5,
+            MinimumSimilarity = 0.70,
+            MinimumScoreMargin = 0.03,
+            IncludeCandidatesInResponse = true
+        };
+
+        var result = validator.Validate(null, options);
 
         Assert.False(result.Succeeded);
     }

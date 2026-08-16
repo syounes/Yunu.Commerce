@@ -156,7 +156,8 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
                 .Select(h => new AttributeHint(h.RawName, h.RawValue))
                 .ToArray(),
             SearchTerms: modelResponse.SearchTerms.ToArray(),
-            Confidence: Math.Clamp(modelResponse.Confidence, 0m, 1m));
+            Confidence: Math.Clamp(modelResponse.Confidence, 0m, 1m),
+            CategorySearchQuery: modelResponse.CategorySearchQuery);
     }
 
     private static string BuildUserMessage(IntentRewriteRequest request)

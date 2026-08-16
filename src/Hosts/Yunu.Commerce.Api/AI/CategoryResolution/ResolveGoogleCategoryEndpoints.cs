@@ -59,12 +59,13 @@ public static class ResolveGoogleCategoryEndpoints
         try
         {
             var result = await resolver.ResolveAsync(
-                new ResolveGoogleCategoryRequest(request.RawCategoryHint, request.SemanticQuery, locale),
+                new ResolveGoogleCategoryRequest(request.RawCategoryHint, request.SemanticQuery, locale, request.CategorySearchQuery),
                 cancellationToken);
 
             var response = new ResolveGoogleCategoryHttpResponse
             {
                 RawCategoryHint = result.RawCategoryHint,
+                CategorySearchQuery = request.CategorySearchQuery,
                 Status = result.Status.ToString(),
                 GoogleCategoryId = result.GoogleCategoryId,
                 CategoryName = result.CategoryName,

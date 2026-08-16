@@ -65,7 +65,7 @@ public static class CatalogIntentResolutionEndpoints
             {
                 Status = result.Status.ToString(),
                 Intent = result.Intent is null ? null : MapIntent(result.Intent),
-                Category = result.Category is null ? null : MapCategory(result.Category),
+                Category = result.Category is null ? null : MapCategory(result.Category, result.Intent?.CategorySearchQuery),
                 Attributes = result.Attributes is null ? null : MapAttributes(result.Attributes),
                 ReadyForProposal = result.ReadyForProposal,
                 Warnings = result.Warnings
@@ -116,6 +116,7 @@ public static class CatalogIntentResolutionEndpoints
         DetectedLanguage = intent.DetectedLanguage,
         TargetLocale = intent.TargetLocale,
         CategoryHint = intent.CategoryHint,
+        CategorySearchQuery = intent.CategorySearchQuery,
         AttributeHints = intent.AttributeHints
             .Select(h => new AttributeHintResponse { RawName = h.RawName, RawValue = h.RawValue })
             .ToArray(),
@@ -123,9 +124,10 @@ public static class CatalogIntentResolutionEndpoints
         Confidence = intent.Confidence
     };
 
-    private static ResolveGoogleCategoryHttpResponse MapCategory(ResolveGoogleCategoryResult category) => new()
+    private static ResolveGoogleCategoryHttpResponse MapCategory(ResolveGoogleCategoryResult category, string? categorySearchQuery) => new()
     {
         RawCategoryHint = category.RawCategoryHint,
+        CategorySearchQuery = categorySearchQuery,
         Status = category.Status.ToString(),
         GoogleCategoryId = category.GoogleCategoryId,
         CategoryName = category.CategoryName,
@@ -160,6 +162,7 @@ public static class CatalogIntentResolutionEndpoints
             AttributeName = a.AttributeName,
             DataType = a.DataType,
             NormalizedValue = a.NormalizedValue,
+            TypedValue = MapTypedValue(a.TypedValue),
             AttributeOptionId = a.AttributeOptionId,
             OptionCode = a.OptionCode,
             OptionName = a.OptionName,
@@ -189,4 +192,28 @@ public static class CatalogIntentResolutionEndpoints
             OptionRerankReason = a.OptionRerankReason
         }).ToArray()
     };
+
+    private static ResolvedAttributeValueDto? MapTypedValue(
+        Yunu.Commerce.Catalog.Application.AttributeResolution.ResolvedAttributeValue? typedValue)
+    {
+        if (typedValue is null)
+        {
+            return null;
+        }
+
+        return new ResolvedAttributeValueDto
+        {
+            DisplayValue = typedValue.DisplayValue,
+            TextValue = typedValue.TextValue,
+            IntegerValue = typedValue.IntegerValue,
+            DecimalValue = typedValue.DecimalValue,
+            BooleanValue = typedValue.BooleanValue,
+            DateTimeValue = typedValue.DateTimeValue,
+            MoneyAmount = typedValue.MoneyAmount,
+            CurrencyCode = typedValue.CurrencyCode,
+            MeasurementValue = typedValue.MeasurementValue,
+            UnitCode = typedValue.UnitCode,
+            JsonValue = typedValue.JsonValue
+        };
+    }
 }

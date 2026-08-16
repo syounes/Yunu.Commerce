@@ -27,6 +27,9 @@ internal sealed class IntentRewriteModelResponse
     [JsonPropertyName("categoryHint")]
     public string? CategoryHint { get; init; }
 
+    [JsonPropertyName("categorySearchQuery")]
+    public string? CategorySearchQuery { get; init; }
+
     [JsonPropertyName("attributeHints")]
     public List<IntentRewriteModelAttributeHint> AttributeHints { get; init; } = [];
 

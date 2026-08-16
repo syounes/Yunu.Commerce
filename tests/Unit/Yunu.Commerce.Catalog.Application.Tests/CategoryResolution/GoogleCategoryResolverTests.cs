@@ -235,13 +235,87 @@ public sealed class GoogleCategoryResolverTests
         Assert.Equal(GoogleCategoryResolutionStatus.Resolved, result.Status);
     }
 
-    [Theory]
-    [InlineData("tênis para corrida", null, "Categoria de produto sugerida: tênis para corrida.")]
-    [InlineData("tênis para corrida", "  ", "Categoria de produto sugerida: tênis para corrida.")]
-    [InlineData("tênis para corrida", "tênis masculino branco tamanho 41", "Categoria de produto sugerida: tênis para corrida. Contexto do produto: tênis masculino branco tamanho 41.")]
-    public void BuildSemanticCategoryText_ComposesDeterministicText(string hint, string? semanticQuery, string expected)
+    [Fact]
+    public async Task ResolveAsync_UsesCategorySearchQuery_ForEmbeddingWhenPresent()
     {
-        var text = GoogleCategoryResolver.BuildSemanticCategoryText(hint, semanticQuery);
+        var (resolver, catalogReader, semanticSearch, embeddingProvider, _) = CreateSut(minimumSimilarity: 0.10, minimumScoreMargin: 0.50);
+
+        catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+        semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.80));
+
+        await resolver.ResolveAsync(
+            new ResolveGoogleCategoryRequest(
+                RawCategoryHint: "tênis para corrida",
+                SemanticQuery: "produto masculino usado nos pés para corrida, tamanho 41",
+                CategorySearchQuery: "sapatos esportivos para corrida"),
+            CancellationToken.None);
+
+        Assert.Contains("sapatos esportivos para corrida", embeddingProvider.LastText);
+        Assert.DoesNotContain("tênis para corrida", embeddingProvider.LastText);
+        Assert.DoesNotContain("produto masculino usado nos pés", embeddingProvider.LastText);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_FallsBackToRawCategoryHint_WhenCategorySearchQueryMissing()
+    {
+        var (resolver, catalogReader, semanticSearch, embeddingProvider, _) = CreateSut(minimumSimilarity: 0.10, minimumScoreMargin: 0.50);
+
+        catalogReader.Add(new GoogleCategoryCatalogEntry(1, "Categoria A", "Categoria A", 1, true, true));
+        semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1, "Categoria A", 0.80));
+
+        await resolver.ResolveAsync(
+            new ResolveGoogleCategoryRequest("categoria a distinta do texto oficial", null, CategorySearchQuery: null),
+            CancellationToken.None);
+
+        Assert.Contains("categoria a distinta do texto oficial", embeddingProvider.LastText);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_DoesNotConcatenateSemanticQuery_IntoEmbeddingText()
+    {
+        var (resolver, catalogReader, semanticSearch, embeddingProvider, _) = CreateSut(minimumSimilarity: 0.10, minimumScoreMargin: 0.50);
+
+        catalogReader.Add(new GoogleCategoryCatalogEntry(1, "Categoria A", "Categoria A", 1, true, true));
+        semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1, "Categoria A", 0.80));
+
+        await resolver.ResolveAsync(
+            new ResolveGoogleCategoryRequest("categoria distinta sem match exato", "contexto amplo do produto que nunca deve entrar no embedding"),
+            CancellationToken.None);
+
+        Assert.NotNull(embeddingProvider.LastText);
+        Assert.DoesNotContain("contexto amplo", embeddingProvider.LastText);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_ExactMatch_UsesCategorySearchQuery_NotAmbiguousRawHint()
+    {
+        var (resolver, catalogReader, semanticSearch, _, _) = CreateSut();
+
+        // "tênis" alone would exact-match the sport category; the
+        // disambiguated CategorySearchQuery must be used for exact match
+        // instead, so it correctly finds/creates the shoes candidate path via
+        // semantic search rather than the ambiguous exact match.
+        catalogReader.Add(new GoogleCategoryCatalogEntry(1065, "Tênis", "Artigos esportivos > Artigos para prática de esportes > Tênis", 3, true, true));
+        catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+        semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.90));
+
+        var result = await resolver.ResolveAsync(
+            new ResolveGoogleCategoryRequest(
+                RawCategoryHint: "tênis",
+                SemanticQuery: "calçado esportivo masculino para corrida",
+                CategorySearchQuery: "sapatos esportivos para corrida"),
+            CancellationToken.None);
+
+        Assert.NotEqual(1065, result.GoogleCategoryId);
+    }
+
+    [Theory]
+    [InlineData("tênis para corrida", "Categoria de produto sugerida: tênis para corrida.")]
+    [InlineData("sapatos esportivos para corrida", "Categoria de produto sugerida: sapatos esportivos para corrida.")]
+    public void BuildSemanticCategoryText_ComposesDeterministicText(string effectiveQuery, string expected)
+    {
+        var text = GoogleCategoryResolver.BuildSemanticCategoryText(effectiveQuery);
 
         Assert.Equal(expected, text);
     }
@@ -400,6 +474,95 @@ public sealed class GoogleCategoryResolverTests
             // The reranker must never see the official GoogleCategoryId.
             Assert.NotNull(reranker.LastRequest);
             Assert.All(reranker.LastRequest!.Candidates, c => Assert.DoesNotContain("187", c.DisplayText));
+        }
+
+        [Fact]
+        public async Task ResolveAsync_TenisParaCorridaRegression_SelectsSapatosNeverTenisEsporte()
+        {
+            // Regression for the documented pt-BR failure: "tênis" is
+            // ambiguous between the shoe (187 - Sapatos) and the sport
+            // (1065 - Tênis). With CategorySearchQuery correctly disambiguated
+            // to "sapatos esportivos para corrida", the reranker must select
+            // 187 and must never select 1065, even if a badly-justified
+            // rerank result tried to.
+            var rerankResult = new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                SelectedCandidateIndex: 1,
+                Confidence: 0.9,
+                Ranking:
+                [
+                    new RerankedCandidateScore(1, 0.90),
+                    new RerankedCandidateScore(0, 0.20)
+                ],
+                Reason: "O produto é um calçado esportivo para corrida, não uma modalidade esportiva.");
+
+            var reranker = FakeCandidateReranker.Returning(rerankResult);
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1065, "Tênis", "Artigos esportivos > Artigos para prática de esportes > Tênis", 3, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1065, "Tênis", 0.50));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.42));
+
+            var result = await resolver.ResolveAsync(
+                new ResolveGoogleCategoryRequest(
+                    RawCategoryHint: "tênis para corrida",
+                    SemanticQuery: "calçado esportivo masculino para corrida em asfalto",
+                    CategorySearchQuery: "sapatos esportivos para corrida"),
+                CancellationToken.None);
+
+            Assert.Equal(GoogleCategoryResolutionStatus.Resolved, result.Status);
+            Assert.Equal(187, result.GoogleCategoryId);
+            Assert.NotEqual(1065, result.GoogleCategoryId);
+            Assert.Equal(ResolutionStrategy.Reranked, result.Strategy);
+            Assert.True(result.RerankConfidence >= 0.75);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_RerankerSelectsInventedId_IsRejectedByIndexValidation()
+        {
+            // The reranker can only select among the candidates it was given
+            // by index; an out-of-range index must never resolve to an
+            // invented/incorrect official category. This is enforced by the
+            // reranker adapter validating SelectedCandidateIndex against the
+            // request's candidate count before returning "Selected" (covered
+            // by the reranker adapter's own tests). Here we assert that if
+            // upstream validation is bypassed and an out-of-range index
+            // reaches the resolver, it throws instead of silently resolving
+            // to the wrong category.
+            var rerankResult = new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                SelectedCandidateIndex: 99,
+                Confidence: 0.9,
+                Ranking: [new RerankedCandidateScore(99, 0.9)],
+                Reason: "invalid");
+
+            var reranker = FakeCandidateReranker.Returning(rerankResult);
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1065, "Tênis", "Artigos esportivos > Artigos para prática de esportes > Tênis", 3, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1065, "Tênis", 0.50));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.42));
+
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => resolver.ResolveAsync(
+                new ResolveGoogleCategoryRequest(
+                    RawCategoryHint: "tênis para corrida",
+                    SemanticQuery: "calçado esportivo",
+                    CategorySearchQuery: "sapatos esportivos para corrida"),
+                CancellationToken.None));
         }
 
         [Fact]

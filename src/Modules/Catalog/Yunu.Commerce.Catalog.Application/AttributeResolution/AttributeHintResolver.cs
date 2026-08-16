@@ -467,7 +467,7 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 definitionRerankReason);
         }
 
-        if (!AttributeValueValidator.TryNormalize(definition.DataType, hint.RawValue, out var normalizedValue))
+        if (!AttributeValueValidator.TryNormalize(definition, hint.RawValue, out var typedValue, out var invalidReason))
         {
             return new ResolvedAttributeHint(
                 hint.RawName,
@@ -485,7 +485,7 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 null,
                 requirementLevel,
                 filteredCandidates,
-                $"rawValue '{hint.RawValue}' could not be interpreted as {definition.DataType}.")
+                invalidReason ?? $"rawValue '{hint.RawValue}' could not be interpreted as {definition.DataType}.")
             with
             {
                 DefinitionStrategy = definitionStrategy,
@@ -502,7 +502,7 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             definition.Code,
             definition.Name,
             definition.DataType,
-            normalizedValue,
+            typedValue?.DisplayValue,
             null,
             null,
             null,
@@ -515,7 +515,8 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         {
             DefinitionStrategy = definitionStrategy,
             DefinitionRerankConfidence = definitionRerankConfidence,
-            DefinitionRerankReason = definitionRerankReason
+            DefinitionRerankReason = definitionRerankReason,
+            TypedValue = typedValue
         };
     }
 

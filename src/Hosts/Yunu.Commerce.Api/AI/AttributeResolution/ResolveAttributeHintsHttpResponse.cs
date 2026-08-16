@@ -30,6 +30,8 @@ public sealed class ResolvedAttributeHintDto
 
     public string? NormalizedValue { get; init; }
 
+    public ResolvedAttributeValueDto? TypedValue { get; init; }
+
     public int? AttributeOptionId { get; init; }
 
     public string? OptionCode { get; init; }
@@ -81,4 +83,34 @@ public sealed class AttributeOptionCandidateDto
     public required string OptionName { get; init; }
 
     public required double Similarity { get; init; }
+}
+
+/// <summary>
+/// Wire contract mirroring
+/// <see cref="Yunu.Commerce.Catalog.Application.AttributeResolution.ResolvedAttributeValue"/>.
+/// Only the field(s) matching the attribute's DataType are populated.
+/// </summary>
+public sealed class ResolvedAttributeValueDto
+{
+    public required string DisplayValue { get; init; }
+
+    public string? TextValue { get; init; }
+
+    public long? IntegerValue { get; init; }
+
+    public decimal? DecimalValue { get; init; }
+
+    public bool? BooleanValue { get; init; }
+
+    public DateTimeOffset? DateTimeValue { get; init; }
+
+    public decimal? MoneyAmount { get; init; }
+
+    public string? CurrencyCode { get; init; }
+
+    public decimal? MeasurementValue { get; init; }
+
+    public string? UnitCode { get; init; }
+
+    public string? JsonValue { get; init; }
 }

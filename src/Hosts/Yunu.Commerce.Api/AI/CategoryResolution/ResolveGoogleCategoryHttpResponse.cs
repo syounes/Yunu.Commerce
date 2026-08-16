@@ -21,6 +21,8 @@ public sealed class ResolveGoogleCategoryHttpResponse
 {
     public required string RawCategoryHint { get; init; }
 
+    public string? CategorySearchQuery { get; init; }
+
     public required string Status { get; init; }
 
     public long? GoogleCategoryId { get; init; }

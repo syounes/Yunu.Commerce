@@ -114,6 +114,7 @@ public static class ResolveAttributeHintsEndpoints
                     AttributeName = a.AttributeName,
                     DataType = a.DataType,
                     NormalizedValue = a.NormalizedValue,
+                    TypedValue = MapTypedValue(a.TypedValue),
                     AttributeOptionId = a.AttributeOptionId,
                     OptionCode = a.OptionCode,
                     OptionName = a.OptionName,
@@ -158,5 +159,29 @@ public static class ResolveAttributeHintsEndpoints
         {
             return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
+    }
+
+    private static ResolvedAttributeValueDto? MapTypedValue(
+        Yunu.Commerce.Catalog.Application.AttributeResolution.ResolvedAttributeValue? typedValue)
+    {
+        if (typedValue is null)
+        {
+            return null;
+        }
+
+        return new ResolvedAttributeValueDto
+        {
+            DisplayValue = typedValue.DisplayValue,
+            TextValue = typedValue.TextValue,
+            IntegerValue = typedValue.IntegerValue,
+            DecimalValue = typedValue.DecimalValue,
+            BooleanValue = typedValue.BooleanValue,
+            DateTimeValue = typedValue.DateTimeValue,
+            MoneyAmount = typedValue.MoneyAmount,
+            CurrencyCode = typedValue.CurrencyCode,
+            MeasurementValue = typedValue.MeasurementValue,
+            UnitCode = typedValue.UnitCode,
+            JsonValue = typedValue.JsonValue
+        };
     }
 }

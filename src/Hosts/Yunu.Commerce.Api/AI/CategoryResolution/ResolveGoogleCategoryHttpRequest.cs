@@ -10,6 +10,8 @@ public sealed class ResolveGoogleCategoryHttpRequest
 {
     public required string RawCategoryHint { get; init; }
 
+    public string? CategorySearchQuery { get; init; }
+
     public string? SemanticQuery { get; init; }
 
     public string Locale { get; init; } = "pt-BR";

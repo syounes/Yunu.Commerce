@@ -27,9 +27,12 @@ internal sealed class FakeEmbeddingProvider : IEmbeddingProvider
 
     public bool ThrowOnGenerate { get; set; }
 
+    public string? LastText { get; private set; }
+
     public Task<EmbeddingResult> GenerateAsync(string text, CancellationToken cancellationToken = default)
     {
         CallCount++;
+        LastText = text;
 
         if (ThrowOnGenerate)
         {
