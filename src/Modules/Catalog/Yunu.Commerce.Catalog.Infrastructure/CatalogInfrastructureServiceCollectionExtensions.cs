@@ -11,6 +11,7 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmb
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.ProductProposals;
 using Yunu.Commerce.Catalog.Domain.Skus;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
@@ -47,6 +48,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IProductRepository, MongoProductRepository>();
         services.AddSingleton<ISkuRepository, MongoSkuRepository>();
+        services.AddSingleton<IProductProposalRepository, MongoProductProposalRepository>();
 
         services.Configure<GoogleTaxonomyOptions>(configuration.GetSection("Catalog:GoogleTaxonomy"));
         services.Configure<GoogleTaxonomySqlOptions>(configuration.GetSection("Catalog:GoogleTaxonomySql"));

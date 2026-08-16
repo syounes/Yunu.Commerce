@@ -10,6 +10,7 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
+using Yunu.Commerce.Catalog.Application.ProductProposals;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
@@ -30,6 +31,9 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateSkuHandler>();
         services.AddScoped<GetSkuByIdHandler>();
         services.AddScoped<GetSkusByProductIdHandler>();
+
+        services.AddScoped<CreateProductProposalHandler>();
+        services.AddScoped<GetProductProposalByIdHandler>();
 
         services.AddScoped<SynchronizeGoogleTaxonomyHandler>();
         services.AddScoped<GenerateGoogleTaxonomyEmbeddingHandler>();

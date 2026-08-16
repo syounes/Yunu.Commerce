@@ -8,9 +8,17 @@ namespace Yunu.Commerce.Catalog.Application.CatalogIntentResolution;
 /// <summary>
 /// Default <see cref="ICatalogIntentResolutionOrchestrator"/> implementation
 /// (docs task: "Catalog intent resolution orchestration"). Calls <see
-/// cref="IIntentRewriter"/> exactly once, then resolves the category and
-/// attribute hints deterministically (embeddings/pgvector/SQL Server); never
-/// makes a second LLM call. Never persists anything.
+/// cref="IIntentRewriter"/> exactly once; category and attribute hint
+/// resolution then run deterministically against embeddings/pgvector/SQL
+/// Server, but <see cref="IGoogleCategoryResolver"/> and <see
+/// cref="IAttributeHintResolver"/> may each additionally invoke <see
+/// cref="Yunu.Commerce.AI.Application.Reranking.ICandidateReranker"/>
+/// (conditionally, only for candidates without an exact match, when
+/// reranking is enabled) — one call for category resolution, and up to two
+/// calls per attribute hint (definition and, for Enum attributes, option).
+/// The orchestrator itself never calls the Intent Rewriter more than once,
+/// but the overall pipeline may therefore perform additional LLM calls
+/// beyond it. Never persists anything.
 /// </summary>
 public sealed class CatalogIntentResolutionOrchestrator : ICatalogIntentResolutionOrchestrator
 {
@@ -51,7 +59,10 @@ public sealed class CatalogIntentResolutionOrchestrator : ICatalogIntentResoluti
 
         // Intent Rewriter is called exactly once; category and attribute
         // resolution reuse categoryHint/semanticQuery/attributeHints from
-        // this single response.
+        // this single response. Note: the resolvers invoked below may still
+        // trigger additional, conditional LLM calls via ICandidateReranker
+        // (see class-level remarks) — that is unrelated to the Intent
+        // Rewriter call being singular.
         var intentStopwatch = System.Diagnostics.Stopwatch.StartNew();
         var intent = await _intentRewriter.RewriteAsync(
             new IntentRewriteRequest(request.Input, request.Locale),
