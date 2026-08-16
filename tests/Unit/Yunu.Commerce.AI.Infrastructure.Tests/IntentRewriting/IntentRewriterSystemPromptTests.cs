@@ -204,4 +204,34 @@ public sealed class IntentRewriterSystemPromptTests
         Assert.Contains("capa compatível com iPhone 15", IntentRewriterSystemPrompt.Text);
         Assert.Contains("{ \"rawName\": \"compatibilidade\", \"rawValue\": \"iPhone 15\" }", IntentRewriterSystemPrompt.Text);
     }
+
+    [Fact]
+    public void Prompt_is_versioned_v6()
+    {
+        Assert.Equal("v6", IntentRewriterSystemPrompt.Version);
+    }
+
+    [Fact]
+    public void Prompt_instructs_one_property_per_attributeHint_with_decomposition_examples()
+    {
+        Assert.Contains(
+            "Cada attributeHint deve representar exatamente uma propriedade independente",
+            NormalizedText);
+        Assert.Contains("tamanho 38 no sistema brasileiro", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"sistema de tamanho\", \"rawValue\": \"brasileiro\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("SSD de 1 TB", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"tipo de armazenamento\", \"rawValue\": \"SSD\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"armazenamento\", \"rawValue\": \"1 TB\" }", IntentRewriterSystemPrompt.Text);
+    }
+
+    [Fact]
+    public void Prompt_forbids_splitting_number_from_unit_and_atomic_semantic_values()
+    {
+        Assert.Contains(
+            "NÃO decomponha um número e sua unidade de medida",
+            NormalizedText);
+        Assert.Contains("620 g", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("USB-C", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Wi-Fi", IntentRewriterSystemPrompt.Text);
+    }
 }

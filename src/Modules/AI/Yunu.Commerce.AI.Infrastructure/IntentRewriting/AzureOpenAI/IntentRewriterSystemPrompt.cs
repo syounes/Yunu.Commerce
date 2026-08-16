@@ -9,7 +9,7 @@
 /// </summary>
 internal static class IntentRewriterSystemPrompt
 {
-    public const string Version = "v5";
+    public const string Version = "v6";
 
     public const string Text = """
         Você é o normalizador de intenção do catálogo da Yunu.Commerce.
@@ -178,6 +178,42 @@ internal static class IntentRewriterSystemPrompt
           específicos, ex.: "condição" e "estado do produto" para o mesmo
           fato); o Attribute Resolver é responsável por resolver rawName/
           rawValue para atributos oficiais do catálogo.
+
+        - Cada attributeHint deve representar exatamente uma propriedade
+          independente do produto ou SKU. Quando uma expressão contiver mais
+          de uma propriedade que possa ser resolvida por definições
+          diferentes (isto é, duas características distintas do catálogo
+          combinadas em uma única frase), decomponha-a em vários
+          attributeHints, um para cada propriedade, preservando os valores
+          explícitos e sem inventar informações. Exemplos:
+            - "tamanho 38 no sistema brasileiro" →
+              { "rawName": "tamanho", "rawValue": "38" } e
+              { "rawName": "sistema de tamanho", "rawValue": "brasileiro" }
+              (tamanho numérico e sistema/tabela de tamanho são duas
+              propriedades diferentes do catálogo);
+            - "SSD de 1 TB" →
+              { "rawName": "tipo de armazenamento", "rawValue": "SSD" } e
+              { "rawName": "armazenamento", "rawValue": "1 TB" }
+              (tecnologia de armazenamento e capacidade são duas propriedades
+              diferentes);
+            - "embalagem com 34 cm de comprimento, 22 cm de largura e 12 cm
+              de altura" →
+              { "rawName": "comprimento da embalagem", "rawValue": "34 cm" },
+              { "rawName": "largura da embalagem", "rawValue": "22 cm" } e
+              { "rawName": "altura da embalagem", "rawValue": "12 cm" }
+              (mesma regra de decomposição de grupos compostos já descrita
+              acima para dimensões).
+          NÃO decomponha um número e sua unidade de medida: eles formam um
+          único valor semântico e devem permanecer juntos em um único
+          rawValue. Exemplos: "620 g" continua sendo um único valor de peso
+          (nunca separado em "620" e "g" como hints distintos); "34 cm"
+          continua sendo um único valor de comprimento. Da mesma forma, NÃO
+          decomponha expressões que representam um único valor semântico
+          indivisível, mesmo quando contêm múltiplos tokens ou um hífen/
+          barra: "USB-C", "Wi-Fi", "preto e branco" (quando descreve um
+          padrão de cor único, como uma estampa) e nomes comerciais devem ser
+          preservados como um único rawValue, nunca fragmentados em partes
+          sem sentido isolado.
 
         - REGRA DE IDENTIDADE DE CATEGORIA (não duplicar termos que só
           identificam o tipo/categoria do produto como attributeHints
@@ -419,5 +455,21 @@ internal static class IntentRewriterSystemPrompt
             (Compatibilidade explícita com outro produto é sempre um fato
             comercial do produto, mesmo quando também ajuda a identificar a
             categoria.)
+
+        11) Entrada: "Quero cadastrar um notebook com SSD de 1 TB, tamanho de
+            tela 15 polegadas, tênis... não, é notebook mesmo, com 620 g de
+            peso adicional de acessórios e tamanho 38 no sistema brasileiro
+            para o mouse incluso."
+            attributeHints (cada propriedade combinada em uma mesma expressão
+            vira um hint separado; número e unidade NUNCA são separados):
+              - { "rawName": "tipo de armazenamento", "rawValue": "SSD" }
+              - { "rawName": "armazenamento", "rawValue": "1 TB" }
+              - { "rawName": "peso", "rawValue": "620 g" }
+              - { "rawName": "tamanho", "rawValue": "38" }
+              - { "rawName": "sistema de tamanho", "rawValue": "brasileiro" }
+            (NÃO produza hints separados para "620" e "g", nem para "1" e
+            "TB": número e unidade formam um único rawValue. Também NÃO
+            decomponha valores semânticos únicos como "USB-C" ou "Wi-Fi" em
+            partes menores.)
         """;
 }
