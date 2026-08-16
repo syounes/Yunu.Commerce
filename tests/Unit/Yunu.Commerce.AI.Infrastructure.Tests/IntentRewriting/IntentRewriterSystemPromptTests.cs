@@ -113,4 +113,13 @@ public sealed class IntentRewriterSystemPromptTests
         Assert.Contains("\"rawName\": \"tipo de conexão\"", IntentRewriterSystemPrompt.Text);
         Assert.Contains("categorySearchQuery: \"microfones\"", IntentRewriterSystemPrompt.Text);
     }
+
+    [Fact]
+    public void Prompt_instructs_extracting_technical_qualifiers_even_when_present_in_other_fields()
+    {
+        Assert.Contains("Extraia também qualificadores técnicos explícitos do produto como", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("attributeHint próprio (ex.: { \"rawName\": \"tipo\", \"rawValue\":", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"condensador\" }), além de continuar aparecendo em categoryHint", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("deduplique um fato removendo-o de attributeHints", IntentRewriterSystemPrompt.Text);
+    }
 }

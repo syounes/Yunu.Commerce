@@ -337,6 +337,7 @@ public sealed class CatalogIntentResolutionOrchestratorTests
             CategoryHint: "microfone condensador USB",
             AttributeHints:
             [
+                new AttributeHint("tipo", "condensador"),
                 new AttributeHint("tipo de conexão", "USB"),
                 new AttributeHint("cor", "preto"),
                 new AttributeHint("material", "alumínio"),
@@ -367,6 +368,10 @@ public sealed class CatalogIntentResolutionOrchestratorTests
 
         var attributesResult = new ResolveAttributeHintsResult(
             [
+                new ResolvedAttributeHint("tipo", "condensador", AttributeResolutionStatus.Resolved, 70, "microphone_type", "Tipo de microfone", "Text", "condensador", null, null, null, 1.0, 1.0, null, [], null)
+                {
+                    TypedValue = new ResolvedAttributeValue("condensador", TextValue: "condensador")
+                },
                 new ResolvedAttributeHint("tipo de conexão", "USB", AttributeResolutionStatus.Resolved, 69, "connection_type", "Tipo de conexão", "Enum", "USB", 1901, "USB", "USB", 1.0, 1.0, null, [], null),
                 new ResolvedAttributeHint("cor", "preto", AttributeResolutionStatus.Resolved, 14, "color", "Cor", "Text", "preto", null, null, null, 1.0, 1.0, null, [], null)
                 {
@@ -408,13 +413,23 @@ public sealed class CatalogIntentResolutionOrchestratorTests
         Assert.Equal("microfones", categoryResolver.LastRequest!.CategorySearchQuery);
 
         var forwardedHints = attributeResolver.LastRequest!.AttributeHints;
-        Assert.Equal(9, forwardedHints.Count);
+        Assert.Equal(10, forwardedHints.Count);
 
         // Package dimensions must be three distinct hints, never aggregated.
         Assert.Contains(forwardedHints, h => h.RawName == "comprimento da embalagem" && h.RawValue == "25 cm");
         Assert.Contains(forwardedHints, h => h.RawName == "largura da embalagem" && h.RawValue == "15 cm");
         Assert.Contains(forwardedHints, h => h.RawName == "altura da embalagem" && h.RawValue == "10 cm");
         Assert.DoesNotContain(forwardedHints, h => h.RawName.Contains("dimensões", StringComparison.OrdinalIgnoreCase));
+
+        // Explicit technical qualifier "condensador" must be extracted as its
+        // own attributeHint even though it is also present in categoryHint and
+        // semanticQuery (facts must not be deduplicated across fields).
+        Assert.Contains(forwardedHints, h => h.RawName == "tipo" && h.RawValue == "condensador");
+        Assert.Contains("condensador", intentResult.CategoryHint);
+        Assert.Contains("condensador", intentResult.SemanticQuery);
+
+        var microphoneType = result.Attributes!.Attributes.Single(a => a.AttributeCode == "microphone_type");
+        Assert.Equal("condensador", microphoneType.TypedValue!.TextValue);
 
         var connection = result.Attributes!.Attributes.Single(a => a.AttributeCode == "connection_type");
         Assert.Equal("USB", connection.OptionCode);

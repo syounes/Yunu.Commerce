@@ -115,7 +115,23 @@ internal static class IntentRewriterSystemPrompt
               categoryHint (por exemplo, "para corrida" deve aparecer tanto no
               categoryHint/categorySearchQuery quanto como attributeHint de
               uso/ocasião — não é uma escolha exclusiva, ambos podem conter a
-              mesma informação com propósitos diferentes).
+              mesma informação com propósitos diferentes);
+            - também aparece em semanticQuery — semanticQuery e attributeHints
+              não são mutuamente exclusivos, e um fato presente em um deles
+              nunca deve ser removido do outro.
+          Extraia também qualificadores técnicos explícitos do produto como
+          attributeHints, mesmo quando esses qualificadores já fizerem parte do
+          categoryHint ou do categorySearchQuery. Por exemplo, para "microfone
+          condensador USB", o termo "condensador" é uma característica técnica
+          do produto (tipo/tecnologia do microfone) e deve gerar um
+          attributeHint próprio (ex.: { "rawName": "tipo", "rawValue":
+          "condensador" }), além de continuar aparecendo em categoryHint
+          ("microfone condensador USB") e em semanticQuery. O mesmo vale para
+          outras características técnicas explícitas, como: dinâmico, sem fio,
+          USB, USB-C, Bluetooth, voltagem, capacidade, potência, resolução,
+          frequência, e demais características declaradas pelo usuário. Nunca
+          deduplique um fato removendo-o de attributeHints só porque ele
+          também aparece em categoryHint, categorySearchQuery ou semanticQuery.
           Nunca invente um fato que o usuário não mencionou explicitamente.
           Os nomes exatos de rawName podem variar (sinônimos semanticamente
           equivalentes são aceitáveis, ex.: "uso", "ocasião", "finalidade" para o
@@ -196,7 +212,10 @@ internal static class IntentRewriterSystemPrompt
            microfone — sem cor, material, condição, conexão, uso ou dados
            logísticos.)
            attributeHints (um hint por atributo atômico; as três dimensões da
-           embalagem NUNCA são agregadas em um único hint):
+           embalagem NUNCA são agregadas em um único hint; "condensador"
+           também aparece em categoryHint acima, mas NÃO deve ser removido de
+           attributeHints por esse motivo):
+             - { "rawName": "tipo", "rawValue": "condensador" }
              - { "rawName": "tipo de conexão", "rawValue": "USB" }
              - { "rawName": "cor", "rawValue": "preto" }
              - { "rawName": "material", "rawValue": "alumínio" }
