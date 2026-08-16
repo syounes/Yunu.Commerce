@@ -30,5 +30,6 @@ public enum IntentRewriteFailureReason
     Timeout,
     ContentFiltered,
     InvalidResponse,
-    ProviderUnavailable
+    ProviderUnavailable,
+    OutputTruncated
 }

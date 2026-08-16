@@ -25,7 +25,7 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
     private static readonly ChatCompletionOptions CompletionOptionsTemplate = new()
     {
         Temperature = 0.1f,
-        MaxOutputTokenCount = 800,
+        MaxOutputTokenCount = 2000,
         ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
             IntentRewriteJsonSchema.SchemaName,
             IntentRewriteJsonSchema.Build(),
@@ -39,13 +39,32 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
     public AzureOpenAIIntentRewriter(
         IAIModelCatalog modelCatalog,
         ILogger<AzureOpenAIIntentRewriter> logger)
+        : this(modelCatalog, logger, transport: null)
+    {
+    }
+
+    /// <summary>
+    /// Test-only constructor allowing a fake <see cref="System.ClientModel.Primitives.PipelineTransport"/>
+    /// to be injected so unit tests can simulate provider responses (e.g.
+    /// <c>finish_reason = length</c>) without calling the real Azure OpenAI
+    /// endpoint. Not intended for production DI registration.
+    /// </summary>
+    internal AzureOpenAIIntentRewriter(
+        IAIModelCatalog modelCatalog,
+        ILogger<AzureOpenAIIntentRewriter> logger,
+        System.ClientModel.Primitives.PipelineTransport? transport)
     {
         _model = modelCatalog.Resolve(AIModelNames.IntentRewriter, AIModelType.Chat);
         _logger = logger;
 
-        var client = new OpenAIClient(
-            new ApiKeyCredential(_model.ApiKey),
-            new OpenAIClientOptions { Endpoint = new Uri(_model.Endpoint) });
+        var clientOptions = new OpenAIClientOptions { Endpoint = new Uri(_model.Endpoint) };
+
+        if (transport is not null)
+        {
+            clientOptions.Transport = transport;
+        }
+
+        var client = new OpenAIClient(new ApiKeyCredential(_model.ApiKey), clientOptions);
 
         _chatClient = client.GetChatClient(_model.DeploymentName);
     }
@@ -104,6 +123,27 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
                 "The Azure OpenAI content filter blocked this request.");
         }
 
+        if (completion.FinishReason == ChatFinishReason.Length)
+        {
+            var truncatedResponseLength = completion.Content.Count > 0 ? completion.Content[0].Text?.Length : 0;
+
+            _logger.LogWarning(
+                "Intent rewrite output truncated for deployment {DeploymentName}: FinishReason={FinishReason}, " +
+                "InputTokenCount={InputTokenCount}, OutputTokenCount={OutputTokenCount}, " +
+                "ResponseLength={ResponseLength}, Provider={Provider}, TraceId={TraceId}",
+                _model.DeploymentName,
+                completion.FinishReason,
+                completion.Usage?.InputTokenCount,
+                completion.Usage?.OutputTokenCount,
+                truncatedResponseLength,
+                "AzureOpenAI",
+                System.Diagnostics.Activity.Current?.Id);
+
+            throw new IntentRewriteException(
+                IntentRewriteFailureReason.OutputTruncated,
+                "Azure OpenAI intent rewrite response was truncated because it reached the maximum output token limit.");
+        }
+
         var rawJson = completion.Content.Count > 0 ? completion.Content[0].Text : null;
 
         if (string.IsNullOrWhiteSpace(rawJson))
@@ -121,6 +161,16 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
         }
         catch (JsonException ex)
         {
+            _logger.LogWarning(
+                "Intent rewrite response could not be parsed for deployment {DeploymentName}: " +
+                "LineNumber={LineNumber}, BytePositionInLine={BytePositionInLine}, " +
+                "ResponseLength={ResponseLength}, FinishReason={FinishReason}",
+                _model.DeploymentName,
+                ex.LineNumber,
+                ex.BytePositionInLine,
+                rawJson.Length,
+                completion.FinishReason);
+
             throw new IntentRewriteException(
                 IntentRewriteFailureReason.InvalidResponse,
                 $"Azure OpenAI intent rewrite response could not be parsed: {ex.Message}");
@@ -139,10 +189,18 @@ public sealed class AzureOpenAIIntentRewriter : IIntentRewriter
         }
 
         _logger.LogInformation(
-            "Intent rewrite completed for deployment {DeploymentName} with intent {Intent} in {ElapsedMilliseconds}ms",
+            "Intent rewrite completed for deployment {DeploymentName} with intent {Intent} in {ElapsedMilliseconds}ms, " +
+            "FinishReason={FinishReason}, InputTokenCount={InputTokenCount}, OutputTokenCount={OutputTokenCount}, " +
+            "ResponseLength={ResponseLength}, Provider={Provider}, TraceId={TraceId}",
             _model.DeploymentName,
             intent,
-            stopwatch.ElapsedMilliseconds);
+            stopwatch.ElapsedMilliseconds,
+            completion.FinishReason,
+            completion.Usage?.InputTokenCount,
+            completion.Usage?.OutputTokenCount,
+            rawJson.Length,
+            "AzureOpenAI",
+            System.Diagnostics.Activity.Current?.Id);
 
         return new IntentRewriteResult(
             OriginalInput: request.Input,

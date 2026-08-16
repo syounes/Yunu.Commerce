@@ -22,6 +22,7 @@ public static class IntentRewritingEndpoints
             .Produces<RewriteIntentResponse>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status502BadGateway)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
 
         return app;
@@ -75,19 +76,34 @@ public static class IntentRewritingEndpoints
         }
         catch (IntentRewriteException ex)
         {
-            return ex.Reason switch
-            {
-                IntentRewriteFailureReason.ContentFiltered => Results.Problem(
-                    detail: "The request could not be processed because it was blocked by the content filter.",
-                    statusCode: StatusCodes.Status422UnprocessableEntity),
-                IntentRewriteFailureReason.Timeout or IntentRewriteFailureReason.ProviderUnavailable
-                    or IntentRewriteFailureReason.RateLimited => Results.Problem(
-                        detail: "The intent rewriting provider is currently unavailable. Please try again later.",
-                        statusCode: StatusCodes.Status503ServiceUnavailable),
-                _ => Results.Problem(
-                    detail: "The intent rewriting provider returned an unexpected response.",
-                    statusCode: StatusCodes.Status503ServiceUnavailable)
-            };
+            return MapFailureToResult(ex.Reason);
         }
+    }
+
+    /// <summary>
+    /// Maps an <see cref="IntentRewriteFailureReason"/> to the corresponding
+    /// HTTP problem response. Extracted as an internal static method (docs
+    /// task: "Intent/Query Rewriting" HTTP 503 investigation) so unit tests
+    /// can assert the mapping without exercising the full minimal API
+    /// pipeline.
+    /// </summary>
+    internal static IResult MapFailureToResult(IntentRewriteFailureReason reason)
+    {
+        return reason switch
+        {
+            IntentRewriteFailureReason.ContentFiltered => Results.Problem(
+                detail: "The request could not be processed because it was blocked by the content filter.",
+                statusCode: StatusCodes.Status422UnprocessableEntity),
+            IntentRewriteFailureReason.Timeout or IntentRewriteFailureReason.ProviderUnavailable
+                or IntentRewriteFailureReason.RateLimited => Results.Problem(
+                    detail: "The intent rewriting provider is currently unavailable. Please try again later.",
+                    statusCode: StatusCodes.Status503ServiceUnavailable),
+            IntentRewriteFailureReason.OutputTruncated => Results.Problem(
+                detail: "The intent rewriting provider response was truncated because it reached the maximum output token limit.",
+                statusCode: StatusCodes.Status502BadGateway),
+            _ => Results.Problem(
+                detail: "The intent rewriting provider returned an unexpected response.",
+                statusCode: StatusCodes.Status503ServiceUnavailable)
+        };
     }
 }
