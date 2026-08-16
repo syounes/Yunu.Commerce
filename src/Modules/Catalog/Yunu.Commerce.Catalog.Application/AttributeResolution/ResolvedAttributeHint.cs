@@ -1,4 +1,6 @@
-﻿namespace Yunu.Commerce.Catalog.Application.AttributeResolution;
+﻿using Yunu.Commerce.Catalog.Application.CategoryResolution;
+
+namespace Yunu.Commerce.Catalog.Application.AttributeResolution;
 
 /// <summary>
 /// Resolution outcome for a single attribute hint (docs task: "Semantic
@@ -68,4 +70,38 @@ public sealed record ResolvedAttributeHint(
             [])
     {
     }
+
+    /// <summary>
+    /// How the definition/option was ultimately resolved (docs task:
+    /// "Contextual candidate reranking" §15). Null when the hint was never
+    /// resolved (e.g. NotFound before any candidate list existed).
+    /// </summary>
+    public ResolutionStrategy? DefinitionStrategy { get; init; }
+
+    /// <summary>
+    /// Reranker confidence for the attribute definition selection, present
+    /// only when <see cref="DefinitionStrategy"/> is
+    /// <see cref="ResolutionStrategy.Reranked"/>. Distinct from
+    /// <see cref="DefinitionSimilarity"/> (vector similarity): the two
+    /// metrics are never conflated.
+    /// </summary>
+    public double? DefinitionRerankConfidence { get; init; }
+
+    public string? DefinitionRerankReason { get; init; }
+
+    /// <summary>
+    /// How the attribute option was ultimately resolved, when applicable
+    /// (Enum attributes only).
+    /// </summary>
+    public ResolutionStrategy? OptionStrategy { get; init; }
+
+    /// <summary>
+    /// Reranker confidence for the attribute option selection, present only
+    /// when <see cref="OptionStrategy"/> is
+    /// <see cref="ResolutionStrategy.Reranked"/>. Distinct from
+    /// <see cref="ValueSimilarity"/> (vector similarity).
+    /// </summary>
+    public double? OptionRerankConfidence { get; init; }
+
+    public string? OptionRerankReason { get; init; }
 }

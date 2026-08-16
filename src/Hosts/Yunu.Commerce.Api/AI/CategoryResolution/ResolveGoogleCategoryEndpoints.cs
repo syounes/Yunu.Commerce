@@ -79,7 +79,10 @@ public static class ResolveGoogleCategoryEndpoints
                     Depth = c.Depth,
                     Similarity = c.Similarity
                 }).ToArray(),
-                Reason = result.Reason
+                Reason = result.Reason,
+                ResolutionStrategy = result.Strategy?.ToString(),
+                RerankConfidence = result.RerankConfidence,
+                RerankReason = result.RerankReason
             };
 
             return Results.Ok(response);

@@ -2,8 +2,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Yunu.Commerce.AI.Application.Embeddings;
 using Yunu.Commerce.AI.Application.IntentRewriting;
+using Yunu.Commerce.AI.Application.Reranking;
 using Yunu.Commerce.AI.Infrastructure.Embeddings.Providers.AzureOpenAI;
 using Yunu.Commerce.AI.Infrastructure.IntentRewriting.AzureOpenAI;
+using Yunu.Commerce.AI.Infrastructure.Reranking.AzureOpenAI;
 
 namespace Yunu.Commerce.AI.Infrastructure;
 
@@ -25,6 +27,7 @@ public static class AIInfrastructureServiceCollectionExtensions
     {
         services.AddSingleton<IEmbeddingProvider, AzureOpenAIEmbeddingProvider>();
         services.AddSingleton<IIntentRewriter, AzureOpenAIIntentRewriter>();
+        services.AddSingleton<ICandidateReranker, AzureOpenAICandidateReranker>();
 
         return services;
     }

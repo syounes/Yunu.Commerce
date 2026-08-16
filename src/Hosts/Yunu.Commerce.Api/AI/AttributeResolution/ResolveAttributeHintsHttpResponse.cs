@@ -47,6 +47,18 @@ public sealed class ResolvedAttributeHintDto
     public IReadOnlyList<AttributeOptionCandidateDto> OptionCandidates { get; init; } = Array.Empty<AttributeOptionCandidateDto>();
 
     public string? Reason { get; init; }
+
+    public string? DefinitionResolutionStrategy { get; init; }
+
+    public double? DefinitionRerankConfidence { get; init; }
+
+    public string? DefinitionRerankReason { get; init; }
+
+    public string? OptionResolutionStrategy { get; init; }
+
+    public double? OptionRerankConfidence { get; init; }
+
+    public string? OptionRerankReason { get; init; }
 }
 
 public sealed class AttributeCandidateDto

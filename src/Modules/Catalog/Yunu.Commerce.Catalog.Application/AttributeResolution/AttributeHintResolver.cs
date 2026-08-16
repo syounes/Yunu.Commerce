@@ -4,16 +4,24 @@ using Microsoft.Extensions.Options;
 using Yunu.Commerce.AI.Application.Configuration;
 using Yunu.Commerce.AI.Application.Embeddings;
 using Yunu.Commerce.AI.Application.IntentRewriting;
+using Yunu.Commerce.AI.Application.Reranking;
+using Yunu.Commerce.Catalog.Application.CategoryResolution;
 
 namespace Yunu.Commerce.Catalog.Application.AttributeResolution;
 
 /// <summary>
 /// Deterministic, hybrid resolver of textual attribute hints (docs task:
-/// "Semantic attribute hint resolution"): exact match first (Etapa B), then
-/// semantic search + SQL Server validation (Etapa C/D), then free-value
-/// validation (Etapa E). Never persists anything and never invents IDs/codes:
-/// every accepted result is hydrated and validated against SQL Server
-/// (<see cref="IAttributeCatalogReader"/>) before being returned.
+/// "Semantic attribute hint resolution" + "Contextual candidate reranking"):
+/// exact match first (Etapa B, no reranking), then semantic search + SQL
+/// Server validation (Etapa C/D) + LLM contextual reranking (<see
+/// cref="ICandidateReranker"/>) for both attribute definitions and, for Enum
+/// attributes, attribute options, then free-value validation (Etapa E). Never
+/// persists anything and never invents IDs/codes: every accepted result is
+/// hydrated and validated against SQL Server (<see
+/// cref="IAttributeCatalogReader"/>) before being returned, and the reranker
+/// only ever selects among those already-validated candidates by index; it
+/// never receives or returns an official AttributeDefinitionId, AttributeCode,
+/// AttributeOptionId or OptionCode.
 ///
 /// Explicitly resolves the "CategoryEmbedding" logical model (docs
 /// authorization item 3) via <see cref="IAIModelCatalog"/> instead of relying
@@ -27,7 +35,9 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
     private readonly IAIModelCatalog _modelCatalog;
     private readonly IAttributeSemanticSearch _semanticSearch;
     private readonly IAttributeCatalogReader _catalogReader;
+    private readonly ICandidateReranker _reranker;
     private readonly AttributeResolutionOptions _options;
+    private readonly RerankingOptions _rerankingOptions;
     private readonly ILogger<AttributeHintResolver> _logger;
 
     public AttributeHintResolver(
@@ -35,14 +45,18 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         IAIModelCatalog modelCatalog,
         IAttributeSemanticSearch semanticSearch,
         IAttributeCatalogReader catalogReader,
+        ICandidateReranker reranker,
         IOptions<AttributeResolutionOptions> options,
+        IOptions<RerankingOptions> rerankingOptions,
         ILogger<AttributeHintResolver> logger)
     {
         _embeddingOrchestrator = embeddingOrchestrator;
         _modelCatalog = modelCatalog;
         _semanticSearch = semanticSearch;
         _catalogReader = catalogReader;
+        _reranker = reranker;
         _options = options.Value;
+        _rerankingOptions = rerankingOptions.Value;
         _logger = logger;
     }
 
@@ -174,33 +188,10 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 continue;
             }
 
-            var top = validCandidates[0];
-
-            if (top.Similarity < _options.DefinitionMinimumSimilarity)
-            {
-                results[index] = NotFoundResult(hint, candidateDtos, "Best candidate is below the minimum similarity threshold.");
-                continue;
-            }
-
-            if (validCandidates.Length > 1)
-            {
-                var second = validCandidates[1];
-                var margin = top.Similarity - second.Similarity;
-
-                if (margin < _options.MinimumScoreMargin)
-                {
-                    results[index] = AmbiguousResult(hint, candidateDtos, "Top candidates are too close to safely disambiguate.");
-                    continue;
-                }
-            }
-
-            var resolvedDefinition = hydratedByCode[top.AttributeCode];
-
-            results[index] = await BuildDefinitionResolvedHintAsync(
+            results[index] = await ResolveDefinitionFromCandidatesAsync(
                 hint,
-                resolvedDefinition,
-                top.Similarity,
                 candidateDtos,
+                hydratedByCode,
                 request.GoogleCategoryId,
                 request.Locale,
                 cancellationToken);
@@ -238,6 +229,184 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         return new ResolveAttributeHintsResult(resolvedAttributes, allResolved);
     }
 
+    /// <summary>
+    /// Decides the attribute definition for a hint that did not match
+    /// exactly, from its SQL-Server-validated semantic candidates (docs task:
+    /// "Contextual candidate reranking" §11). Vector similarity alone is a
+    /// recall signal; when reranking is enabled the LLM only ever selects
+    /// among these already-validated candidates by index, and
+    /// AttributeDefinitionId/AttributeCode are never exposed to it.
+    /// </summary>
+    private async Task<ResolvedAttributeHint> ResolveDefinitionFromCandidatesAsync(
+        AttributeHint hint,
+        IReadOnlyList<AttributeCandidate> candidateDtos,
+        Dictionary<string, AttributeDefinitionCatalogEntry> hydratedByCode,
+        long? googleCategoryId,
+        string locale,
+        CancellationToken cancellationToken)
+    {
+        if (!_rerankingOptions.AlwaysRerankSemanticMatches)
+        {
+            return await ResolveDefinitionByVectorThresholdAsync(
+                hint, candidateDtos, hydratedByCode, googleCategoryId, locale, cancellationToken, ResolutionStrategy.VectorOnly);
+        }
+
+        var rerankCandidates = candidateDtos
+            .Take(_rerankingOptions.MaximumCandidates)
+            .Select((c, index) => new RerankCandidate(
+                index,
+                c.AttributeName,
+                $"Vector similarity: {c.Similarity:F4}"))
+            .ToArray();
+
+        var rerankRequest = new CandidateRerankRequest(
+            Task: "Select the catalog attribute definition that represents the user's field.",
+            Query: hint.RawName,
+            Context: string.IsNullOrWhiteSpace(hint.RawValue) ? null : $"Value: {hint.RawValue}",
+            Candidates: rerankCandidates,
+            Locale: locale);
+
+        try
+        {
+            var rerankResult = await _reranker.RerankAsync(rerankRequest, cancellationToken);
+
+            _logger.LogInformation(
+                "Attribute definition reranking for hint {RawName}: Decision={Decision} Confidence={Confidence} CandidateCount={CandidateCount}",
+                hint.RawName,
+                rerankResult.Decision,
+                rerankResult.Confidence,
+                rerankCandidates.Length);
+
+            return await BuildDefinitionRerankedResultAsync(
+                hint, candidateDtos, hydratedByCode, googleCategoryId, locale, cancellationToken, rerankResult);
+        }
+        catch (CandidateRerankException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Attribute definition reranking technical failure for hint {RawName}: {Reason}. Falling back to vector threshold.",
+                hint.RawName,
+                ex.Reason);
+
+            return await ResolveDefinitionByVectorThresholdAsync(
+                hint, candidateDtos, hydratedByCode, googleCategoryId, locale, cancellationToken, ResolutionStrategy.VectorFallback);
+        }
+    }
+
+    private async Task<ResolvedAttributeHint> ResolveDefinitionByVectorThresholdAsync(
+        AttributeHint hint,
+        IReadOnlyList<AttributeCandidate> candidateDtos,
+        Dictionary<string, AttributeDefinitionCatalogEntry> hydratedByCode,
+        long? googleCategoryId,
+        string locale,
+        CancellationToken cancellationToken,
+        ResolutionStrategy strategyWhenResolved)
+    {
+        var top = candidateDtos[0];
+
+        if (top.Similarity < _options.DefinitionMinimumSimilarity)
+        {
+            return NotFoundResult(hint, candidateDtos, "Best candidate is below the minimum similarity threshold.");
+        }
+
+        if (candidateDtos.Count > 1)
+        {
+            var second = candidateDtos[1];
+            var margin = top.Similarity - second.Similarity;
+
+            if (margin < _options.MinimumScoreMargin)
+            {
+                return AmbiguousResult(hint, candidateDtos, "Top candidates are too close to safely disambiguate.");
+            }
+        }
+
+        var resolvedDefinition = hydratedByCode[top.AttributeCode];
+
+        return await BuildDefinitionResolvedHintAsync(
+            hint,
+            resolvedDefinition,
+            top.Similarity,
+            candidateDtos,
+            googleCategoryId,
+            locale,
+            cancellationToken,
+            strategyWhenResolved,
+            null,
+            null);
+    }
+
+    private async Task<ResolvedAttributeHint> BuildDefinitionRerankedResultAsync(
+        AttributeHint hint,
+        IReadOnlyList<AttributeCandidate> candidateDtos,
+        Dictionary<string, AttributeDefinitionCatalogEntry> hydratedByCode,
+        long? googleCategoryId,
+        string locale,
+        CancellationToken cancellationToken,
+        CandidateRerankResult rerankResult)
+    {
+        if (rerankResult.Decision == CandidateRerankDecision.None)
+        {
+            return NotFoundResult(hint, candidateDtos, rerankResult.Reason) with
+            {
+                DefinitionStrategy = ResolutionStrategy.Reranked,
+                DefinitionRerankConfidence = rerankResult.Confidence,
+                DefinitionRerankReason = rerankResult.Reason
+            };
+        }
+
+        if (rerankResult.Decision == CandidateRerankDecision.Ambiguous)
+        {
+            return AmbiguousResult(hint, candidateDtos, rerankResult.Reason) with
+            {
+                DefinitionStrategy = ResolutionStrategy.Reranked,
+                DefinitionRerankConfidence = rerankResult.Confidence,
+                DefinitionRerankReason = rerankResult.Reason
+            };
+        }
+
+        var selectedCandidate = candidateDtos[rerankResult.SelectedCandidateIndex!.Value];
+
+        if (rerankResult.Confidence < _rerankingOptions.MinimumConfidence)
+        {
+            return AmbiguousResult(hint, candidateDtos, "Reranker confidence is below the minimum required confidence.") with
+            {
+                DefinitionStrategy = ResolutionStrategy.Reranked,
+                DefinitionRerankConfidence = rerankResult.Confidence,
+                DefinitionRerankReason = rerankResult.Reason
+            };
+        }
+
+        if (rerankResult.Ranking.Count > 1)
+        {
+            var orderedRanking = rerankResult.Ranking.OrderByDescending(r => r.RelevanceScore).ToArray();
+            var margin = orderedRanking[0].RelevanceScore - orderedRanking[1].RelevanceScore;
+
+            if (margin < _rerankingOptions.MinimumScoreMargin)
+            {
+                return AmbiguousResult(hint, candidateDtos, "Reranker relevance scores are too close to safely disambiguate.") with
+                {
+                    DefinitionStrategy = ResolutionStrategy.Reranked,
+                    DefinitionRerankConfidence = rerankResult.Confidence,
+                    DefinitionRerankReason = rerankResult.Reason
+                };
+            }
+        }
+
+        var resolvedDefinition = hydratedByCode[selectedCandidate.AttributeCode];
+
+        return await BuildDefinitionResolvedHintAsync(
+            hint,
+            resolvedDefinition,
+            selectedCandidate.Similarity,
+            candidateDtos,
+            googleCategoryId,
+            locale,
+            cancellationToken,
+            ResolutionStrategy.Reranked,
+            rerankResult.Confidence,
+            rerankResult.Reason);
+    }
+
     private async Task<ResolvedAttributeHint> BuildDefinitionResolvedHintAsync(
         AttributeHint hint,
         AttributeDefinitionCatalogEntry definition,
@@ -246,6 +415,23 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         long? googleCategoryId,
         string locale,
         CancellationToken cancellationToken)
+    {
+        return await BuildDefinitionResolvedHintAsync(
+            hint, definition, definitionSimilarity, candidates, googleCategoryId, locale, cancellationToken,
+            ResolutionStrategy.ExactMatch, null, null);
+    }
+
+    private async Task<ResolvedAttributeHint> BuildDefinitionResolvedHintAsync(
+        AttributeHint hint,
+        AttributeDefinitionCatalogEntry definition,
+        double definitionSimilarity,
+        IReadOnlyList<AttributeCandidate> candidates,
+        long? googleCategoryId,
+        string locale,
+        CancellationToken cancellationToken,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason)
     {
         AttributeRequirementLevel? requirementLevel = null;
 
@@ -275,7 +461,10 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 filteredCandidates,
                 requirementLevel,
                 locale,
-                cancellationToken);
+                cancellationToken,
+                definitionStrategy,
+                definitionRerankConfidence,
+                definitionRerankReason);
         }
 
         if (!AttributeValueValidator.TryNormalize(definition.DataType, hint.RawValue, out var normalizedValue))
@@ -296,7 +485,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 null,
                 requirementLevel,
                 filteredCandidates,
-                $"rawValue '{hint.RawValue}' could not be interpreted as {definition.DataType}.");
+                $"rawValue '{hint.RawValue}' could not be interpreted as {definition.DataType}.")
+            with
+            {
+                DefinitionStrategy = definitionStrategy,
+                DefinitionRerankConfidence = definitionRerankConfidence,
+                DefinitionRerankReason = definitionRerankReason
+            };
         }
 
         return new ResolvedAttributeHint(
@@ -315,7 +510,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             null,
             requirementLevel,
             filteredCandidates,
-            null);
+            null)
+        with
+        {
+            DefinitionStrategy = definitionStrategy,
+            DefinitionRerankConfidence = definitionRerankConfidence,
+            DefinitionRerankReason = definitionRerankReason
+        };
     }
 
     private async Task<ResolvedAttributeHint> ResolveEnumValueAsync(
@@ -325,7 +526,10 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         IReadOnlyList<AttributeCandidate> definitionCandidates,
         AttributeRequirementLevel? requirementLevel,
         string locale,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason)
     {
         if (string.IsNullOrWhiteSpace(hint.RawValue))
         {
@@ -348,7 +552,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 null,
                 requirementLevel,
                 definitionCandidates,
-                null);
+                null)
+            with
+            {
+                DefinitionStrategy = definitionStrategy,
+                DefinitionRerankConfidence = definitionRerankConfidence,
+                DefinitionRerankReason = definitionRerankReason
+            };
         }
 
         var normalizedValue = AttributeHintNormalizer.Normalize(hint.RawValue);
@@ -373,7 +583,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 valueSimilarity: 1.0,
                 definitionCandidates,
                 requirementLevel,
-                optionCandidates: []);
+                optionCandidates: [],
+                definitionStrategy,
+                definitionRerankConfidence,
+                definitionRerankReason,
+                optionStrategy: ResolutionStrategy.ExactMatch,
+                optionRerankConfidence: null,
+                optionRerankReason: null);
         }
 
         var resolvedModel = _modelCatalog.Resolve(_options.EmbeddingModel, AIModelType.Embedding);
@@ -396,7 +612,8 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
                 valueSimilarity: null,
                 optionCandidates: [],
-                reason: "No active options found for this attribute.");
+                reason: "No active options found for this attribute.",
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason);
         }
 
         var candidateCodes = semanticOptions.Select(o => o.OptionCode).Distinct().ToArray();
@@ -432,9 +649,112 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
                 valueSimilarity: null,
                 optionCandidates: optionCandidateDtos,
-                reason: "No semantic candidate for this option could be validated in SQL Server.");
+                reason: "No semantic candidate for this option could be validated in SQL Server.",
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason);
         }
 
+        return await ResolveOptionFromCandidatesAsync(
+            hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
+            validOptions, hydratedByCode, optionCandidateDtos, locale, cancellationToken,
+            definitionStrategy, definitionRerankConfidence, definitionRerankReason);
+    }
+
+    /// <summary>
+    /// Decides the attribute option for an Enum attribute value that did not
+    /// match exactly, from its SQL-Server-validated semantic candidates (docs
+    /// task: "Contextual candidate reranking" §12). Only candidates belonging
+    /// to the already-resolved parent attribute are ever sent to the
+    /// reranker; AttributeOptionId/OptionCode are never exposed to it.
+    /// </summary>
+    private async Task<ResolvedAttributeHint> ResolveOptionFromCandidatesAsync(
+        AttributeHint hint,
+        AttributeDefinitionCatalogEntry definition,
+        double definitionSimilarity,
+        IReadOnlyList<AttributeCandidate> definitionCandidates,
+        AttributeRequirementLevel? requirementLevel,
+        IReadOnlyList<SemanticAttributeOptionCandidate> validOptions,
+        Dictionary<string, AttributeOptionCatalogEntry> hydratedByCode,
+        IReadOnlyList<AttributeOptionCandidate> optionCandidateDtos,
+        string locale,
+        CancellationToken cancellationToken,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason)
+    {
+        if (!_rerankingOptions.AlwaysRerankSemanticMatches)
+        {
+            return ResolveOptionByVectorThreshold(
+                hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
+                validOptions, hydratedByCode, optionCandidateDtos,
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason,
+                ResolutionStrategy.VectorOnly);
+        }
+
+        var rerankCandidates = validOptions
+            .Take(_rerankingOptions.MaximumCandidates)
+            .Select((o, index) => new RerankCandidate(
+                index,
+                o.Name,
+                $"Vector similarity: {o.Similarity:F4}"))
+            .ToArray();
+
+        var rerankRequest = new CandidateRerankRequest(
+            Task: $"Select the option of attribute '{definition.Name}' that represents the user's value.",
+            Query: hint.RawValue ?? string.Empty,
+            Context: null,
+            Candidates: rerankCandidates,
+            Locale: locale);
+
+        try
+        {
+            var rerankResult = await _reranker.RerankAsync(rerankRequest, cancellationToken);
+
+            _logger.LogInformation(
+                "Attribute option reranking for hint {RawName}/{RawValue} (attribute {AttributeCode}): Decision={Decision} Confidence={Confidence} CandidateCount={CandidateCount}",
+                hint.RawName,
+                hint.RawValue,
+                definition.Code,
+                rerankResult.Decision,
+                rerankResult.Confidence,
+                rerankCandidates.Length);
+
+            return BuildOptionRerankedResult(
+                hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
+                validOptions, hydratedByCode, optionCandidateDtos,
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason,
+                rerankResult);
+        }
+        catch (CandidateRerankException ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Attribute option reranking technical failure for hint {RawName}/{RawValue}: {Reason}. Falling back to vector threshold.",
+                hint.RawName,
+                hint.RawValue,
+                ex.Reason);
+
+            return ResolveOptionByVectorThreshold(
+                hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
+                validOptions, hydratedByCode, optionCandidateDtos,
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason,
+                ResolutionStrategy.VectorFallback);
+        }
+    }
+
+    private ResolvedAttributeHint ResolveOptionByVectorThreshold(
+        AttributeHint hint,
+        AttributeDefinitionCatalogEntry definition,
+        double definitionSimilarity,
+        IReadOnlyList<AttributeCandidate> definitionCandidates,
+        AttributeRequirementLevel? requirementLevel,
+        IReadOnlyList<SemanticAttributeOptionCandidate> validOptions,
+        Dictionary<string, AttributeOptionCatalogEntry> hydratedByCode,
+        IReadOnlyList<AttributeOptionCandidate> optionCandidateDtos,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason,
+        ResolutionStrategy strategyWhenResolved)
+    {
         var top = validOptions[0];
 
         if (top.Similarity < _options.OptionMinimumSimilarity)
@@ -443,10 +763,11 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                 hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
                 valueSimilarity: top.Similarity,
                 optionCandidates: optionCandidateDtos,
-                reason: "Best option candidate is below the minimum similarity threshold.");
+                reason: "Best option candidate is below the minimum similarity threshold.",
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason);
         }
 
-        if (validOptions.Length > 1)
+        if (validOptions.Count > 1)
         {
             var second = validOptions[1];
             var margin = top.Similarity - second.Similarity;
@@ -470,7 +791,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
                     requirementLevel,
                     definitionCandidates,
                     "Top option candidates are too close to safely disambiguate (insufficient margin between option candidates).",
-                    optionCandidateDtos);
+                    optionCandidateDtos)
+                with
+                {
+                    DefinitionStrategy = definitionStrategy,
+                    DefinitionRerankConfidence = definitionRerankConfidence,
+                    DefinitionRerankReason = definitionRerankReason
+                };
             }
         }
 
@@ -484,7 +811,162 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             top.Similarity,
             definitionCandidates,
             requirementLevel,
-            optionCandidateDtos);
+            optionCandidateDtos,
+            definitionStrategy,
+            definitionRerankConfidence,
+            definitionRerankReason,
+            optionStrategy: strategyWhenResolved,
+            optionRerankConfidence: null,
+            optionRerankReason: null);
+    }
+
+    private ResolvedAttributeHint BuildOptionRerankedResult(
+        AttributeHint hint,
+        AttributeDefinitionCatalogEntry definition,
+        double definitionSimilarity,
+        IReadOnlyList<AttributeCandidate> definitionCandidates,
+        AttributeRequirementLevel? requirementLevel,
+        IReadOnlyList<SemanticAttributeOptionCandidate> validOptions,
+        Dictionary<string, AttributeOptionCatalogEntry> hydratedByCode,
+        IReadOnlyList<AttributeOptionCandidate> optionCandidateDtos,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason,
+        CandidateRerankResult rerankResult)
+    {
+        if (rerankResult.Decision == CandidateRerankDecision.None)
+        {
+            return DefinitionResolvedButOptionNotFound(
+                hint, definition, definitionSimilarity, definitionCandidates, requirementLevel,
+                valueSimilarity: validOptions[0].Similarity,
+                optionCandidates: optionCandidateDtos,
+                reason: rerankResult.Reason,
+                definitionStrategy, definitionRerankConfidence, definitionRerankReason) with
+            {
+                OptionStrategy = ResolutionStrategy.Reranked,
+                OptionRerankConfidence = rerankResult.Confidence,
+                OptionRerankReason = rerankResult.Reason
+            };
+        }
+
+        if (rerankResult.Decision == CandidateRerankDecision.Ambiguous)
+        {
+            return new ResolvedAttributeHint(
+                hint.RawName,
+                hint.RawValue,
+                AttributeResolutionStatus.Ambiguous,
+                definition.AttributeDefinitionId,
+                definition.Code,
+                definition.Name,
+                definition.DataType,
+                null,
+                null,
+                null,
+                null,
+                definitionSimilarity,
+                validOptions[0].Similarity,
+                requirementLevel,
+                definitionCandidates,
+                rerankResult.Reason,
+                optionCandidateDtos)
+            with
+            {
+                DefinitionStrategy = definitionStrategy,
+                DefinitionRerankConfidence = definitionRerankConfidence,
+                DefinitionRerankReason = definitionRerankReason,
+                OptionStrategy = ResolutionStrategy.Reranked,
+                OptionRerankConfidence = rerankResult.Confidence,
+                OptionRerankReason = rerankResult.Reason
+            };
+        }
+
+        var selected = validOptions[rerankResult.SelectedCandidateIndex!.Value];
+
+        if (rerankResult.Confidence < _rerankingOptions.MinimumConfidence)
+        {
+            return new ResolvedAttributeHint(
+                hint.RawName,
+                hint.RawValue,
+                AttributeResolutionStatus.Ambiguous,
+                definition.AttributeDefinitionId,
+                definition.Code,
+                definition.Name,
+                definition.DataType,
+                null,
+                null,
+                null,
+                null,
+                definitionSimilarity,
+                selected.Similarity,
+                requirementLevel,
+                definitionCandidates,
+                "Reranker confidence is below the minimum required confidence.",
+                optionCandidateDtos)
+            with
+            {
+                DefinitionStrategy = definitionStrategy,
+                DefinitionRerankConfidence = definitionRerankConfidence,
+                DefinitionRerankReason = definitionRerankReason,
+                OptionStrategy = ResolutionStrategy.Reranked,
+                OptionRerankConfidence = rerankResult.Confidence,
+                OptionRerankReason = rerankResult.Reason
+            };
+        }
+
+        if (rerankResult.Ranking.Count > 1)
+        {
+            var orderedRanking = rerankResult.Ranking.OrderByDescending(r => r.RelevanceScore).ToArray();
+            var margin = orderedRanking[0].RelevanceScore - orderedRanking[1].RelevanceScore;
+
+            if (margin < _rerankingOptions.MinimumScoreMargin)
+            {
+                return new ResolvedAttributeHint(
+                    hint.RawName,
+                    hint.RawValue,
+                    AttributeResolutionStatus.Ambiguous,
+                    definition.AttributeDefinitionId,
+                    definition.Code,
+                    definition.Name,
+                    definition.DataType,
+                    null,
+                    null,
+                    null,
+                    null,
+                    definitionSimilarity,
+                    selected.Similarity,
+                    requirementLevel,
+                    definitionCandidates,
+                    "Reranker relevance scores are too close to safely disambiguate.",
+                    optionCandidateDtos)
+                with
+                {
+                    DefinitionStrategy = definitionStrategy,
+                    DefinitionRerankConfidence = definitionRerankConfidence,
+                    DefinitionRerankReason = definitionRerankReason,
+                    OptionStrategy = ResolutionStrategy.Reranked,
+                    OptionRerankConfidence = rerankResult.Confidence,
+                    OptionRerankReason = rerankResult.Reason
+                };
+            }
+        }
+
+        var resolvedOption = hydratedByCode[selected.OptionCode];
+
+        return BuildEnumResolvedHint(
+            hint,
+            definition,
+            definitionSimilarity,
+            resolvedOption,
+            selected.Similarity,
+            definitionCandidates,
+            requirementLevel,
+            optionCandidateDtos,
+            definitionStrategy,
+            definitionRerankConfidence,
+            definitionRerankReason,
+            optionStrategy: ResolutionStrategy.Reranked,
+            optionRerankConfidence: rerankResult.Confidence,
+            optionRerankReason: rerankResult.Reason);
     }
 
     private static ResolvedAttributeHint BuildEnumResolvedHint(
@@ -495,7 +977,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         double valueSimilarity,
         IReadOnlyList<AttributeCandidate> definitionCandidates,
         AttributeRequirementLevel? requirementLevel,
-        IReadOnlyList<AttributeOptionCandidate> optionCandidates)
+        IReadOnlyList<AttributeOptionCandidate> optionCandidates,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason,
+        ResolutionStrategy optionStrategy,
+        double? optionRerankConfidence,
+        string? optionRerankReason)
     {
         return new ResolvedAttributeHint(
             hint.RawName,
@@ -514,7 +1002,16 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             requirementLevel,
             definitionCandidates,
             null,
-            optionCandidates);
+            optionCandidates)
+        with
+        {
+            DefinitionStrategy = definitionStrategy,
+            DefinitionRerankConfidence = definitionRerankConfidence,
+            DefinitionRerankReason = definitionRerankReason,
+            OptionStrategy = optionStrategy,
+            OptionRerankConfidence = optionRerankConfidence,
+            OptionRerankReason = optionRerankReason
+        };
     }
 
     private static ResolvedAttributeHint DefinitionResolvedButOptionNotFound(
@@ -525,7 +1022,10 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
         AttributeRequirementLevel? requirementLevel,
         double? valueSimilarity,
         IReadOnlyList<AttributeOptionCandidate> optionCandidates,
-        string reason)
+        string reason,
+        ResolutionStrategy definitionStrategy,
+        double? definitionRerankConfidence,
+        string? definitionRerankReason)
     {
         // The definition itself was resolved, but the Enum value could not be
         // resolved safely: the overall hint is not ready for persistence, so
@@ -549,7 +1049,13 @@ public sealed class AttributeHintResolver : IAttributeHintResolver
             requirementLevel,
             definitionCandidates,
             reason,
-            optionCandidates);
+            optionCandidates)
+        with
+        {
+            DefinitionStrategy = definitionStrategy,
+            DefinitionRerankConfidence = definitionRerankConfidence,
+            DefinitionRerankReason = definitionRerankReason
+        };
     }
 
     private static ResolvedAttributeHint NotFoundResult(AttributeHint hint, IReadOnlyList<AttributeCandidate> candidates, string reason) =>

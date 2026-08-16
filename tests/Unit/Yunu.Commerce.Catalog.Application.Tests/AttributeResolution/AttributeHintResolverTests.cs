@@ -4,15 +4,18 @@ using Xunit;
 using Yunu.Commerce.AI.Application.Configuration;
 using Yunu.Commerce.AI.Application.Embeddings;
 using Yunu.Commerce.AI.Application.IntentRewriting;
+using Yunu.Commerce.AI.Application.Reranking;
 using Yunu.Commerce.Catalog.Application.AttributeResolution;
+using Yunu.Commerce.Catalog.Application.CategoryResolution;
 using Yunu.Commerce.Catalog.Application.Tests.AttributeEmbeddings;
+using Yunu.Commerce.Catalog.Application.Tests.CategoryResolution;
 
 namespace Yunu.Commerce.Catalog.Application.Tests.AttributeResolution;
 
 /// <summary>
 /// Unit tests for AttributeHintResolver (docs task: "Semantic attribute hint
-/// resolution"). Never touches Azure, pgvector or SQL Server: all
-/// dependencies are fakes.
+/// resolution" + "Contextual candidate reranking"). Never touches Azure,
+/// pgvector or SQL Server: all dependencies are fakes.
 /// </summary>
 public sealed class AttributeHintResolverTests
 {
@@ -28,7 +31,9 @@ public sealed class AttributeHintResolverTests
             double definitionMinimumSimilarity = 0.75,
             double optionMinimumSimilarity = 0.78,
             double minimumScoreMargin = 0.05,
-            int topK = 5)
+            int topK = 5,
+            bool alwaysRerankSemanticMatches = false,
+            FakeCandidateReranker? reranker = null)
     {
         var catalogReader = new FakeAttributeCatalogReader();
         var semanticSearch = new FakeAttributeSemanticSearch();
@@ -60,12 +65,28 @@ public sealed class AttributeHintResolverTests
             IncludeCandidatesInResponse = true
         });
 
+        var rerankingOptions = Options.Create(new RerankingOptions
+        {
+            Model = "CatalogReranker",
+            MinimumConfidence = 0.75,
+            MinimumScoreMargin = 0.10,
+            MaximumCandidates = 10,
+            AlwaysRerankSemanticMatches = alwaysRerankSemanticMatches,
+            MaxConcurrentRerankRequests = 4,
+            TechnicalFailureFallback = TechnicalFailureFallbackStrategy.VectorThreshold
+        });
+
+        var candidateReranker = reranker ?? FakeCandidateReranker.Returning(
+            new CandidateRerankResult(CandidateRerankDecision.None, null, 0, [], "unused"));
+
         var resolver = new AttributeHintResolver(
             embeddingOrchestrator,
             modelCatalog,
             semanticSearch,
             catalogReader,
+            candidateReranker,
             resolutionOptions,
+            rerankingOptions,
             NullLogger<AttributeHintResolver>.Instance);
 
         return (resolver, catalogReader, semanticSearch, embeddingProvider);

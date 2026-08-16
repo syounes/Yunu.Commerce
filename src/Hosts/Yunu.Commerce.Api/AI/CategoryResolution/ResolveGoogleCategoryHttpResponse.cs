@@ -36,4 +36,10 @@ public sealed class ResolveGoogleCategoryHttpResponse
     public required IReadOnlyList<GoogleCategoryCandidateDto> Candidates { get; init; }
 
     public string? Reason { get; init; }
+
+    public string? ResolutionStrategy { get; init; }
+
+    public double? RerankConfidence { get; init; }
+
+    public string? RerankReason { get; init; }
 }

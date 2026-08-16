@@ -134,7 +134,13 @@ public static class ResolveAttributeHintsEndpoints
                         OptionName = c.OptionName,
                         Similarity = c.Similarity
                     }).ToArray(),
-                    Reason = a.Reason
+                    Reason = a.Reason,
+                    DefinitionResolutionStrategy = a.DefinitionStrategy?.ToString(),
+                    DefinitionRerankConfidence = a.DefinitionRerankConfidence,
+                    DefinitionRerankReason = a.DefinitionRerankReason,
+                    OptionResolutionStrategy = a.OptionStrategy?.ToString(),
+                    OptionRerankConfidence = a.OptionRerankConfidence,
+                    OptionRerankReason = a.OptionRerankReason
                 }).ToArray()
             };
 

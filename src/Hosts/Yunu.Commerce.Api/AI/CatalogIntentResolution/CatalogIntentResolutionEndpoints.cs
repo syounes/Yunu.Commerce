@@ -140,7 +140,10 @@ public static class CatalogIntentResolutionEndpoints
             Depth = c.Depth,
             Similarity = c.Similarity
         }).ToArray(),
-        Reason = category.Reason
+        Reason = category.Reason,
+        ResolutionStrategy = category.Strategy?.ToString(),
+        RerankConfidence = category.RerankConfidence,
+        RerankReason = category.RerankReason
     };
 
     private static ResolveAttributeHintsHttpResponse MapAttributes(
@@ -177,7 +180,13 @@ public static class CatalogIntentResolutionEndpoints
                 OptionName = c.OptionName,
                 Similarity = c.Similarity
             }).ToArray(),
-            Reason = a.Reason
+            Reason = a.Reason,
+            DefinitionResolutionStrategy = a.DefinitionStrategy?.ToString(),
+            DefinitionRerankConfidence = a.DefinitionRerankConfidence,
+            DefinitionRerankReason = a.DefinitionRerankReason,
+            OptionResolutionStrategy = a.OptionStrategy?.ToString(),
+            OptionRerankConfidence = a.OptionRerankConfidence,
+            OptionRerankReason = a.OptionRerankReason
         }).ToArray()
     };
 }

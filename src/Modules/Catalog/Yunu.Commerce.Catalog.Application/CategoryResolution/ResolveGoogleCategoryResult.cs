@@ -20,4 +20,7 @@ public sealed record ResolveGoogleCategoryResult(
     int? Depth,
     double? Similarity,
     IReadOnlyList<GoogleCategoryCandidate> Candidates,
-    string? Reason);
+    string? Reason,
+    ResolutionStrategy? Strategy = null,
+    double? RerankConfidence = null,
+    string? RerankReason = null);

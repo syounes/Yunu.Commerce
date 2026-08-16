@@ -17,6 +17,13 @@ namespace Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.SqlServer;
 /// (<see cref="GoogleTaxonomySqlOptions"/>, section "Catalog:GoogleTaxonomySql")
 /// since Catalog.AttributeDefinitions / Catalog.AttributeOptions live in the
 /// same database; no second SQL Server configuration section is introduced.
+///
+/// IsSearchable controls only whether an attribute participates in
+/// catalog/storefront product search; it is unrelated to AI semantic
+/// interpretability. Every active Attribute Definition (and every active
+/// Option of an active Definition) is read here and synchronized, regardless
+/// of IsSearchable, so the Attribute Resolver can recognize any active
+/// attribute supplied in natural language.
 /// </summary>
 public sealed class SqlAttributeEmbeddingSourceRepository : IAttributeEmbeddingSourceRepository
 {
@@ -27,17 +34,22 @@ public sealed class SqlAttributeEmbeddingSourceRepository : IAttributeEmbeddingS
         _connectionString = options.Value.ConnectionString;
     }
 
-    public async Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveSearchableDefinitionsAsync(
+    public async Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveDefinitionsAsync(
         CancellationToken cancellationToken = default)
     {
+        // IsSearchable controls storefront/catalog product search
+        // participation only; it must NOT gate semantic/AI embedding
+        // generation. Every active Attribute Definition needs an embedding so
+        // the Attribute Resolver can recognize it from natural language hints
+        // (docs task: "SKU attribute embedding synchronization pipeline").
+        // IsSearchable is still read and preserved in the DTO/metadata below.
         const string sql = """
             SELECT AttributeDefinitionId, Code, GoogleAttributeName, Name, Description, SemanticText,
                    DataType, Cardinality, UnitFamily, ValidationRegex, MinNumericValue, MaxNumericValue,
                    MaxLength, IsGoogleMerchantAttribute, IsVariantAxis, IsSearchable, IsFilterable,
                    IsRequiredByDefault, DisplayOrder, IsActive, UpdatedAt
-            FROM Catalog.AttributeDefinitions
+            FROM [Catalog].[AttributeDefinitions]
             WHERE IsActive = 1
-              AND IsSearchable = 1
             ORDER BY Code
             """;
 
@@ -79,11 +91,15 @@ public sealed class SqlAttributeEmbeddingSourceRepository : IAttributeEmbeddingS
     public async Task<IReadOnlyCollection<AttributeOptionSource>> GetActiveOptionsAsync(
         CancellationToken cancellationToken = default)
     {
+        // Definitions and Options follow the same policy: active definition ->
+        // semantically synchronizable; active option of an active definition
+        // -> semantically synchronizable. IsSearchable of the parent
+        // definition is intentionally not part of this filter.
         const string sql = """
             SELECT o.AttributeOptionId, o.AttributeDefinitionId, d.Code, d.Name, o.Code, o.GoogleValue,
                    o.Name, o.SemanticText, o.DisplayOrder, o.IsActive
-            FROM Catalog.AttributeOptions o
-            INNER JOIN Catalog.AttributeDefinitions d ON d.AttributeDefinitionId = o.AttributeDefinitionId
+            FROM [Catalog].[AttributeOptions] o
+            INNER JOIN [Catalog].[AttributeDefinitions] d ON d.AttributeDefinitionId = o.AttributeDefinitionId
             WHERE o.IsActive = 1
               AND d.IsActive = 1
             ORDER BY d.Code, o.Code

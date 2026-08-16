@@ -12,4 +12,14 @@ public static class AIModelNames
     public const string CategoryEmbedding = "CategoryEmbedding";
 
     public const string IntentRewriter = "IntentRewriter";
+
+    /// <summary>
+    /// Logical Chat model used for contextual candidate reranking (docs task:
+    /// "Contextual candidate reranking"). In this lab version it shares the
+    /// same underlying deployment as <see cref="IntentRewriter"/>, but is
+    /// registered as its own logical model so it can later be repointed at a
+    /// dedicated model, a cross-encoder or another provider without touching
+    /// catalog resolvers.
+    /// </summary>
+    public const string CatalogReranker = "CatalogReranker";
 }

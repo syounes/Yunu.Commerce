@@ -16,7 +16,7 @@ internal sealed class FakeAttributeEmbeddingSourceRepository : IAttributeEmbeddi
 
     public void AddOption(AttributeOptionSource option) => _options.Add(option);
 
-    public Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveSearchableDefinitionsAsync(
+    public Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveDefinitionsAsync(
         CancellationToken cancellationToken = default)
     {
         return Task.FromResult<IReadOnlyCollection<AttributeDefinitionSource>>(_definitions.ToArray());

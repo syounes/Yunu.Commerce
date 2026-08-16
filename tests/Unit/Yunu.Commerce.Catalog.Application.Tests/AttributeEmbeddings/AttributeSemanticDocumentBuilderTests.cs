@@ -174,4 +174,50 @@ public sealed class AttributeSemanticDocumentBuilderTests
     {
         Assert.Equal("gender:MALE", AttributeSemanticDocumentBuilder.BuildOptionEntityId("gender", "MALE"));
     }
+
+    /// <summary>
+    /// Regression coverage for the "shipping_weight" case (docs task: "SKU
+    /// attribute embedding synchronization pipeline"): a non-searchable but
+    /// active definition must go through the exact same generic builder as
+    /// any other definition, with no attribute-specific hardcoding. Only the
+    /// values are equivalent to the real shipping_weight row; the definition
+    /// is not identified by a fixed numeric id.
+    /// </summary>
+    [Fact]
+    public void BuildDefinitionText_Should_Produce_Full_Text_For_NonSearchable_Definition()
+    {
+        var definition = new AttributeDefinitionSource
+        {
+            AttributeDefinitionId = 999,
+            Code = "shipping_weight",
+            GoogleAttributeName = "shipping_weight",
+            Name = "Peso para frete",
+            Description = "Peso usado no cálculo de entrega.",
+            SemanticText = "peso embalagem frete transporte cálculo entrega",
+            DataType = "Measurement",
+            Cardinality = "Single",
+            UnitFamily = "Weight",
+            IsGoogleMerchantAttribute = true,
+            IsVariantAxis = false,
+            IsSearchable = false,
+            IsFilterable = false,
+            IsRequiredByDefault = false,
+            DisplayOrder = 40,
+            IsActive = true,
+            UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        var text = AttributeSemanticDocumentBuilder.BuildDefinitionText(definition);
+
+        Assert.Contains("Atributo: Peso para frete.", text);
+        Assert.Contains("Código: shipping_weight.", text);
+        Assert.Contains("Nome Google: shipping_weight.", text);
+        Assert.Contains("Descrição: Peso usado no cálculo de entrega.", text);
+        Assert.Contains("Significado semântico: peso embalagem frete transporte cálculo entrega.", text);
+        Assert.Contains("Tipo de dado: Measurement.", text);
+        Assert.Contains("Cardinalidade: Single.", text);
+        Assert.Contains("Família de unidade: Weight.", text);
+        Assert.Contains("Pesquisável: não.", text);
+        Assert.Contains("Filtrável: não.", text);
+    }
 }

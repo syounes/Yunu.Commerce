@@ -8,8 +8,8 @@ namespace Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 
 /// <summary>
 /// Orchestrates a full SKU attribute embedding synchronization: read active
-/// searchable Attribute Definitions and active Attribute Options (SQL Server)
-/// → build deterministic pt-BR semantic documents → skip already up-to-date
+/// Attribute Definitions and active Attribute Options (SQL Server) → build
+/// deterministic pt-BR semantic documents → skip already up-to-date
 /// embeddings (content hash comparison against pgvector metadata) → generate
 /// missing/stale embeddings (AI module) → upsert (pgvector) (docs task:
 /// "SKU attribute embedding synchronization pipeline"). Mirrors
@@ -21,6 +21,12 @@ namespace Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 /// Scope: only AttributeDefinition and AttributeOption are synchronized.
 /// Catalog.SkuAttributeValues, MongoDB SKU documents and Google taxonomy
 /// categories are never touched by this handler.
+///
+/// IsSearchable controls only catalog/storefront product search
+/// participation; it does NOT control whether an attribute can be
+/// semantically interpreted by AI. Every active Attribute Definition needs an
+/// embedding so the Attribute Resolver can recognize fields supplied in
+/// natural language, regardless of storefront searchability.
 ///
 /// Skip decision (avoids unnecessary, costly provider calls): for a given
 /// (EntityType, EntityId, Locale), if a persisted row already exists whose
@@ -85,7 +91,7 @@ public sealed class SynchronizeAttributeEmbeddingsHandler
         var startedAtUtc = DateTime.UtcNow;
         var stopwatch = Stopwatch.StartNew();
 
-        var definitions = await _sourceRepository.GetActiveSearchableDefinitionsAsync(cancellationToken);
+        var definitions = await _sourceRepository.GetActiveDefinitionsAsync(cancellationToken);
         var options = await _sourceRepository.GetActiveOptionsAsync(cancellationToken);
         var existingMetadata = await _embeddingRepository.GetMetadataByLocaleAsync(locale, cancellationToken);
         var existingByKey = existingMetadata.ToDictionary(m => (m.EntityType, m.EntityId));

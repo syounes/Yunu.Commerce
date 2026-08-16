@@ -6,15 +6,22 @@
 /// synchronization pipeline"). Distinct from
 /// <see cref="Yunu.Commerce.Catalog.Application.AttributeCatalog.IAttributeCatalogRepository"/>,
 /// which resolves single attributes/options for SKU creation; this port loads
-/// the full active/searchable set used to build semantic documents.
+/// the full active set used to build semantic documents.
+///
+/// <see cref="AttributeDefinitionSource.IsSearchable"/> controls whether an
+/// attribute participates in catalog/storefront product search. It does NOT
+/// control whether the attribute can be semantically interpreted by AI.
+/// Every active Attribute Definition needs an embedding so the Attribute
+/// Resolver can recognize fields supplied in natural language, regardless of
+/// its storefront searchability.
 /// </summary>
 public interface IAttributeEmbeddingSourceRepository
 {
     /// <summary>
-    /// Returns active Attribute Definitions where IsSearchable = 1, ordered
-    /// deterministically by Code.
+    /// Returns every active Attribute Definition (IsActive = 1), regardless of
+    /// IsSearchable, ordered deterministically by Code.
     /// </summary>
-    Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveSearchableDefinitionsAsync(
+    Task<IReadOnlyCollection<AttributeDefinitionSource>> GetActiveDefinitionsAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>

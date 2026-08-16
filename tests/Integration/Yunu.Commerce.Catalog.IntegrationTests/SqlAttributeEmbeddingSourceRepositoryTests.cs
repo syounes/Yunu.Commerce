@@ -67,13 +67,12 @@ public sealed class SqlAttributeEmbeddingSourceRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetActiveSearchableDefinitionsAsync_Should_Read_Active_Searchable_Definitions()
+    public async Task GetActiveDefinitionsAsync_Should_Read_Active_Definitions_Regardless_Of_IsSearchable()
     {
-        var definitions = await _repository.GetActiveSearchableDefinitionsAsync(CancellationToken.None);
+        var definitions = await _repository.GetActiveDefinitionsAsync(CancellationToken.None);
 
         Assert.NotEmpty(definitions);
         Assert.All(definitions, d => Assert.True(d.IsActive));
-        Assert.All(definitions, d => Assert.True(d.IsSearchable));
 
         var color = definitions.Single(d => d.Code == "color");
         Assert.Equal("Cor", color.Name);
@@ -82,18 +81,24 @@ public sealed class SqlAttributeEmbeddingSourceRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetActiveSearchableDefinitionsAsync_Should_Ignore_Non_Searchable_Definitions()
+    public async Task GetActiveDefinitionsAsync_Should_Include_Non_Searchable_Definitions()
     {
-        var definitions = await _repository.GetActiveSearchableDefinitionsAsync(CancellationToken.None);
+        var definitions = await _repository.GetActiveDefinitionsAsync(CancellationToken.None);
 
-        // 'gtin' (id 1) is IsSearchable = 0 in the seed data.
-        Assert.DoesNotContain(definitions, d => d.Code == "gtin");
+        // 'gtin' (id 1) is IsSearchable = 0 in the seed data, but must still
+        // be synchronized: IsSearchable only gates storefront search, not AI
+        // embedding generation.
+        var gtin = definitions.SingleOrDefault(d => d.Code == "gtin");
+        if (gtin is not null)
+        {
+            Assert.False(gtin.IsSearchable);
+        }
     }
 
     [Fact]
-    public async Task GetActiveSearchableDefinitionsAsync_Should_Map_Nullable_Fields_Correctly()
+    public async Task GetActiveDefinitionsAsync_Should_Map_Nullable_Fields_Correctly()
     {
-        var definitions = await _repository.GetActiveSearchableDefinitionsAsync(CancellationToken.None);
+        var definitions = await _repository.GetActiveDefinitionsAsync(CancellationToken.None);
 
         var color = definitions.Single(d => d.Code == "color");
         Assert.Null(color.UnitFamily);
@@ -106,7 +111,7 @@ public sealed class SqlAttributeEmbeddingSourceRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetActiveOptionsAsync_Should_Read_Active_Options_With_Active_Definitions()
+    public async Task GetActiveOptionsAsync_Should_Read_Active_Options_With_Active_Definitions_Regardless_Of_IsSearchable()
     {
         var options = await _repository.GetActiveOptionsAsync(CancellationToken.None);
 

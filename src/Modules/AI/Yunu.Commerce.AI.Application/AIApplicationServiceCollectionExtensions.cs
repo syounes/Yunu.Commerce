@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Yunu.Commerce.AI.Application.Configuration;
 using Yunu.Commerce.AI.Application.Embeddings;
+using Yunu.Commerce.AI.Application.Reranking;
 
 namespace Yunu.Commerce.AI.Application;
 
@@ -31,6 +32,12 @@ public static class AIApplicationServiceCollectionExtensions
         services.AddSingleton<IAIModelCatalog, AIModelCatalog>();
 
         services.AddSingleton<EmbeddingOrchestrator>();
+
+        services.AddOptions<RerankingOptions>()
+            .Bind(configuration.GetSection("AI:Reranking"))
+            .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<RerankingOptions>, RerankingOptionsValidator>();
 
         return services;
     }
