@@ -30,7 +30,14 @@ public sealed class AzureOpenAICandidateReranker : ICandidateReranker
 {
     private static readonly ChatCompletionOptions CompletionOptionsTemplate = new()
     {
-        Temperature = 0.1f,
+        // Lowest variability supported by the SDK/model for this specific
+        // request (docs task: "Google Category reranking hardening" §
+        // Determinism). This only affects the reranker's own request, not
+        // any other Azure OpenAI call (Intent Rewriter uses its own,
+        // separately configured ChatCompletionOptions). Absolute
+        // determinism is never guaranteed by the provider; repeatability is
+        // validated by controlled tests instead.
+        Temperature = 0f,
         MaxOutputTokenCount = 800,
         ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
             CandidateRerankJsonSchema.SchemaName,

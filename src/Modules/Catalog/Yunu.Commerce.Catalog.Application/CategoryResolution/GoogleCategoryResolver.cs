@@ -236,24 +236,27 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
         {
             return ResolveByVectorThresholdOnly(request, candidateDtos, responseCandidates);
         }
-        // Etapa 3 (docs task "Contextual candidate reranking"): the vector
-        // similarity alone is a recall signal, not a precision decision (e.g.
-        // "running shoes" ranking "Sporting Goods" above "Shoes"). Only
-        // SQL-Server-validated candidates are ever sent to the reranker, and
-        // only by Index + DisplayText + Metadata; GoogleCategoryId is never
-        // exposed to the LLM.
+        // Etapa 3 (docs task "Contextual candidate reranking" + "Google
+        // Category reranking hardening"): the vector similarity alone is a
+        // recall signal, not a precision decision (e.g. "running shoes"
+        // ranking "Sporting Goods" above "Shoes"). Only SQL-Server-validated
+        // candidates are ever sent to the reranker, and only by Index +
+        // DisplayText + Metadata; GoogleCategoryId is never exposed to the
+        // LLM. DisplayText carries the full taxonomic path (never just the
+        // leaf name) so homonymous/polysemous leaves in different branches
+        // can be told apart.
         var rerankCandidates = candidateDtos
             .Take(_rerankingOptions.MaximumCandidates)
             .Select((c, index) => new RerankCandidate(
                 index,
-                c.CategoryName,
-                $"Path: {c.CategoryPath}\nVector similarity: {c.Similarity:F4}"))
+                $"{c.CategoryName} ({c.CategoryPath})",
+                $"Path: {c.CategoryPath}\nDepth: {c.Depth}\nVector similarity: {c.Similarity:F4}"))
             .ToArray();
 
         var rerankRequest = new CandidateRerankRequest(
-            Task: "Select the Google product category that describes what the product is.",
+            Task: GoogleCategoryRerankInstructions.Task,
             Query: effectiveQuery,
-            Context: request.SemanticQuery,
+            Context: BuildRerankContext(request, effectiveQuery),
             Candidates: rerankCandidates,
             Locale: request.Locale);
 
@@ -343,7 +346,61 @@ public sealed class GoogleCategoryResolver : IGoogleCategoryResolver
     }
 
     /// <summary>
-    /// Converts a validated <see cref="CandidateRerankResult"/> into the
+    /// Composes the reranker <c>Context</c> for Google Category disambiguation
+    /// (docs task: "Google Category reranking hardening"): original user
+    /// input, normalized query, semantic query, categoryHint,
+    /// categorySearchQuery and attribute hints already extracted by the
+    /// Intent Rewriter. All fields are optional so older callers (e.g. the
+    /// isolated calibration endpoint) that only supply
+    /// RawCategoryHint/SemanticQuery keep working, sending a smaller but
+    /// still valid context. Never waits for or depends on final Attribute
+    /// Resolver output; only the raw, already-available hints are used, so
+    /// no circular dependency with attribute resolution is introduced.
+    /// </summary>
+    private static string BuildRerankContext(ResolveGoogleCategoryRequest request, string effectiveQuery)
+    {
+        var builder = new System.Text.StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(request.OriginalInput))
+        {
+            builder.AppendLine($"Intenção original: {request.OriginalInput}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.NormalizedQuery))
+        {
+            builder.AppendLine($"Consulta normalizada: {request.NormalizedQuery}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SemanticQuery))
+        {
+            builder.AppendLine($"Consulta semântica: {request.SemanticQuery}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.RawCategoryHint))
+        {
+            builder.AppendLine($"categoryHint: {request.RawCategoryHint}");
+        }
+
+        builder.AppendLine($"categorySearchQuery: {effectiveQuery}");
+
+        if (request.AttributeHints is { Count: > 0 })
+        {
+            builder.AppendLine("Atributos explícitos:");
+
+            foreach (var hint in request.AttributeHints)
+            {
+                builder.AppendLine(
+                    string.IsNullOrWhiteSpace(hint.RawValue)
+                        ? $"- {hint.RawName}"
+                        : $"- {hint.RawName}: {hint.RawValue}");
+            }
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    /// <summary>
+    /// Converts the validated <see cref="CandidateRerankResult"/> into the
     /// final resolution outcome. The reranker's <c>SelectedCandidateIndex</c>
     /// is deterministically mapped back to the already-validated
     /// <see cref="GoogleCategoryCandidate"/> at that position in

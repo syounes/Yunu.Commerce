@@ -85,7 +85,14 @@ public sealed class CatalogIntentResolutionOrchestrator : ICatalogIntentResoluti
             var categoryStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             category = await _categoryResolver.ResolveAsync(
-                new ResolveGoogleCategoryRequest(intent.CategoryHint, intent.SemanticQuery, intent.TargetLocale, intent.CategorySearchQuery),
+                new ResolveGoogleCategoryRequest(
+                    intent.CategoryHint,
+                    intent.SemanticQuery,
+                    intent.TargetLocale,
+                    intent.CategorySearchQuery,
+                    intent.OriginalInput,
+                    intent.NormalizedQuery,
+                    intent.AttributeHints),
                 cancellationToken);
 
             categoryStopwatch.Stop();

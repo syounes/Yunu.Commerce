@@ -11,9 +11,15 @@
 -- (docs/data/data-architecture.md §48/Database Migrations); this script is not
 -- executed automatically by the API host on startup.
 
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'GoogleTaxonomyCategories')
+IF SCHEMA_ID(N'Catalog') IS NULL EXEC(N'CREATE SCHEMA Catalog');
+GO
+
+IF SCHEMA_ID(N'Integration') IS NULL EXEC(N'CREATE SCHEMA Integration');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name = 'GoogleTaxonomyCategories' AND s.name = 'Catalog')
 BEGIN
-    CREATE TABLE GoogleTaxonomyCategories
+    CREATE TABLE Catalog.GoogleTaxonomyCategories
     (
         GoogleCategoryId        INT             NOT NULL PRIMARY KEY,
         ParentGoogleCategoryId  INT             NULL,
@@ -29,45 +35,45 @@ BEGIN
 
         CONSTRAINT FK_GoogleTaxonomyCategories_Parent
             FOREIGN KEY (ParentGoogleCategoryId)
-            REFERENCES GoogleTaxonomyCategories (GoogleCategoryId)
+            REFERENCES Catalog.GoogleTaxonomyCategories (GoogleCategoryId)
             -- No cascade delete: taxonomy rows are deactivated, never deleted.
     );
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_ParentGoogleCategoryId' AND object_id = OBJECT_ID('GoogleTaxonomyCategories'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_ParentGoogleCategoryId' AND object_id = OBJECT_ID('Catalog.GoogleTaxonomyCategories'))
 BEGIN
-    CREATE INDEX IX_GoogleTaxonomyCategories_ParentGoogleCategoryId ON GoogleTaxonomyCategories (ParentGoogleCategoryId);
+    CREATE INDEX IX_GoogleTaxonomyCategories_ParentGoogleCategoryId ON Catalog.GoogleTaxonomyCategories (ParentGoogleCategoryId);
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_Name' AND object_id = OBJECT_ID('GoogleTaxonomyCategories'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_Name' AND object_id = OBJECT_ID('Catalog.GoogleTaxonomyCategories'))
 BEGIN
-    CREATE INDEX IX_GoogleTaxonomyCategories_Name ON GoogleTaxonomyCategories (Name);
+    CREATE INDEX IX_GoogleTaxonomyCategories_Name ON Catalog.GoogleTaxonomyCategories (Name);
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_Level' AND object_id = OBJECT_ID('GoogleTaxonomyCategories'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_Level' AND object_id = OBJECT_ID('Catalog.GoogleTaxonomyCategories'))
 BEGIN
-    CREATE INDEX IX_GoogleTaxonomyCategories_Level ON GoogleTaxonomyCategories (Level);
+    CREATE INDEX IX_GoogleTaxonomyCategories_Level ON Catalog.GoogleTaxonomyCategories (Level);
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_IsActive' AND object_id = OBJECT_ID('GoogleTaxonomyCategories'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_IsActive' AND object_id = OBJECT_ID('Catalog.GoogleTaxonomyCategories'))
 BEGIN
-    CREATE INDEX IX_GoogleTaxonomyCategories_IsActive ON GoogleTaxonomyCategories (IsActive);
+    CREATE INDEX IX_GoogleTaxonomyCategories_IsActive ON Catalog.GoogleTaxonomyCategories (IsActive);
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_FullPath' AND object_id = OBJECT_ID('GoogleTaxonomyCategories'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_GoogleTaxonomyCategories_FullPath' AND object_id = OBJECT_ID('Catalog.GoogleTaxonomyCategories'))
 BEGIN
-    CREATE INDEX IX_GoogleTaxonomyCategories_FullPath ON GoogleTaxonomyCategories (FullPath);
+    CREATE INDEX IX_GoogleTaxonomyCategories_FullPath ON Catalog.GoogleTaxonomyCategories (FullPath);
 END
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'GoogleTaxonomyImports')
+IF NOT EXISTS (SELECT 1 FROM sys.tables t JOIN sys.schemas s ON t.schema_id = s.schema_id WHERE t.name = 'GoogleTaxonomyImports' AND s.name = 'Integration')
 BEGIN
-    CREATE TABLE GoogleTaxonomyImports
+    CREATE TABLE Integration.GoogleTaxonomyImports
     (
         ImportId          UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
         SourceLanguage     NVARCHAR(10)     NOT NULL,

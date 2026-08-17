@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Xunit;
 using Yunu.Commerce.AI.Application.Configuration;
 using Yunu.Commerce.AI.Application.Embeddings;
+using Yunu.Commerce.AI.Application.IntentRewriting;
 using Yunu.Commerce.AI.Application.Reranking;
 using Yunu.Commerce.Catalog.Application.CategoryResolution;
 using Yunu.Commerce.Catalog.Application.Tests.AttributeEmbeddings;
@@ -663,5 +664,234 @@ public sealed class GoogleCategoryResolverTests
             Assert.Equal(GoogleCategoryResolutionStatus.Resolved, result.Status);
             Assert.Equal(1, result.GoogleCategoryId);
             Assert.Equal(ResolutionStrategy.VectorFallback, result.Strategy);
+        }
+
+        // ---------------------------------------------------------------
+        // Google Category reranking hardening (docs task: "Google Category
+        // reranking hardening"): the reranker request must carry the full
+        // taxonomic path per candidate (never just the leaf name) plus
+        // OriginalInput/NormalizedQuery/SemanticQuery/categoryHint/
+        // categorySearchQuery/AttributeHints, and use Google-Category-specific
+        // Task instructions, without touching the shared reranker system
+        // prompt used by attribute definition/option reranking.
+        // ---------------------------------------------------------------
+
+        [Fact]
+        public async Task ResolveAsync_SendsFullContextAndFullPathToReranker()
+        {
+            var reranker = FakeCandidateReranker.Returning(
+                new CandidateRerankResult(CandidateRerankDecision.None, null, 0.2, [], "nenhum candidato adequado"));
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1065, "Tênis", "Artigos esportivos > Artigos para prática de esportes > Tênis", 3, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1065, "Tênis", 0.50));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.42));
+
+            var attributeHints = new[]
+            {
+                new AttributeHint("gênero", "feminino"),
+                new AttributeHint("tamanho", "38"),
+                new AttributeHint("sistema de tamanho", "brasileiro"),
+            };
+
+            await resolver.ResolveAsync(
+                new ResolveGoogleCategoryRequest(
+                    RawCategoryHint: "tênis feminino para corrida",
+                    SemanticQuery: "calçado esportivo feminino para corrida",
+                    CategorySearchQuery: "sapatos esportivos femininos para corrida",
+                    OriginalInput: "Quero cadastrar um tênis feminino para corrida, na cor preta, tamanho 38 no sistema brasileiro.",
+                    NormalizedQuery: "Cadastrar um tênis feminino para corrida, na cor preta, tamanho 38 no sistema brasileiro.",
+                    AttributeHints: attributeHints),
+                CancellationToken.None);
+
+            Assert.NotNull(reranker.LastRequest);
+            var request = reranker.LastRequest!;
+
+            Assert.Contains("Quero cadastrar um tênis feminino", request.Context);
+            Assert.Contains("Cadastrar um tênis feminino", request.Context);
+            Assert.Contains("calçado esportivo feminino para corrida", request.Context);
+            Assert.Contains("tênis feminino para corrida", request.Context);
+            Assert.Contains("sapatos esportivos femininos para corrida", request.Context);
+            Assert.Contains("gênero: feminino", request.Context);
+            Assert.Contains("tamanho: 38", request.Context);
+            Assert.Contains("sistema de tamanho: brasileiro", request.Context);
+
+            Assert.All(request.Candidates, c => Assert.Contains(">", c.DisplayText));
+            Assert.Contains(request.Candidates, c => c.DisplayText.Contains("Vestuário e acessórios > Sapatos"));
+            Assert.Contains(request.Candidates, c => c.DisplayText.Contains("Artigos esportivos > Artigos para prática de esportes > Tênis"));
+
+            Assert.Equal(GoogleCategoryRerankInstructions.Task, request.Task);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_OlderCallerWithoutOptionalContext_StillSendsMinimalContext()
+        {
+            // Compatibility: callers that never supply OriginalInput/
+            // NormalizedQuery/AttributeHints (e.g. the isolated calibration
+            // endpoint) must keep working; the reranker still receives a
+            // valid, non-empty context built from the fields that are present.
+            var reranker = FakeCandidateReranker.Returning(
+                new CandidateRerankResult(CandidateRerankDecision.None, null, 0.2, [], "unused"));
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1, "Categoria A", "Categoria A", 1, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(2, "Categoria B", "Categoria B", 1, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1, "Categoria A", 0.50));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(2, "Categoria B", 0.42));
+
+            await resolver.ResolveAsync(new ResolveGoogleCategoryRequest("categoria", "contexto"), CancellationToken.None);
+
+            Assert.NotNull(reranker.LastRequest);
+            Assert.False(string.IsNullOrWhiteSpace(reranker.LastRequest!.Context));
+            Assert.Contains("categorySearchQuery", reranker.LastRequest.Context);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_SportEquipmentScenario_SelectsEquipmentNotShoesJustBecauseOfSharedTerm()
+        {
+            // The reranker must not default to "Shoes" whenever the word
+            // "tênis" appears; when the product is actually sport equipment
+            // (e.g. a racket), it must select the equipment candidate.
+            var rerankResult = new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                SelectedCandidateIndex: 0,
+                Confidence: 0.93,
+                Ranking: [new RerankedCandidateScore(0, 0.93), new RerankedCandidateScore(1, 0.10)],
+                Reason: "O produto é uma raquete usada para jogar tênis, não um calçado.");
+
+            var reranker = FakeCandidateReranker.Returning(rerankResult);
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(2000, "Raquetes", "Artigos esportivos > Artigos para tênis > Raquetes", 3, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(2000, "Raquetes", 0.55));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.40));
+
+            var result = await resolver.ResolveAsync(
+                new ResolveGoogleCategoryRequest(
+                    RawCategoryHint: "raquete para jogar tênis",
+                    SemanticQuery: "raquete oficial para a prática de tênis",
+                    CategorySearchQuery: "raquetes de tênis"),
+                CancellationToken.None);
+
+            Assert.Equal(GoogleCategoryResolutionStatus.Resolved, result.Status);
+            Assert.Equal(2000, result.GoogleCategoryId);
+            Assert.NotEqual(187, result.GoogleCategoryId);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_LeafNameMatchesButPathDoesNot_DoesNotSelectMismatchedPathCandidate()
+        {
+            // Two candidates share a leaf name ("Acessórios") but live under
+            // unrelated branches; the reranker (fake, here configured to pick
+            // the semantically-correct one) must be able to distinguish them
+            // using the full path, not the leaf name alone.
+            var rerankResult = new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                SelectedCandidateIndex: 1,
+                Confidence: 0.9,
+                Ranking: [new RerankedCandidateScore(1, 0.9), new RerankedCandidateScore(0, 0.2)],
+                Reason: "O produto é um acessório eletrônico, não de vestuário.");
+
+            var reranker = FakeCandidateReranker.Returning(rerankResult);
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1, "Acessórios", "Vestuário > Acessórios", 2, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(2, "Acessórios", "Eletrônicos > Acessórios", 2, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1, "Vestuário > Acessórios", 0.60));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(2, "Eletrônicos > Acessórios", 0.55));
+
+            var result = await resolver.ResolveAsync(
+                new ResolveGoogleCategoryRequest("acessório", "capinha para carregador de celular"),
+                CancellationToken.None);
+
+            Assert.Equal(GoogleCategoryResolutionStatus.Resolved, result.Status);
+            Assert.Equal(2, result.GoogleCategoryId);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_RerankerCalledExactlyOnce_WhenRerankingApplies()
+        {
+            var reranker = FakeCandidateReranker.Returning(
+                new CandidateRerankResult(CandidateRerankDecision.None, null, 0.1, [], "unused"));
+
+            var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                minimumSimilarity: 0.10,
+                minimumScoreMargin: 0.50,
+                alwaysRerankSemanticMatches: true,
+                reranker: reranker);
+
+            catalogReader.Add(new GoogleCategoryCatalogEntry(1, "Categoria A", "Categoria A", 1, true, true));
+            catalogReader.Add(new GoogleCategoryCatalogEntry(2, "Categoria B", "Categoria B", 1, true, true));
+
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1, "Categoria A", 0.50));
+            semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(2, "Categoria B", 0.42));
+
+            await resolver.ResolveAsync(new ResolveGoogleCategoryRequest("categoria", null), CancellationToken.None);
+
+            Assert.Equal(1, reranker.CallCount);
+        }
+
+        [Fact]
+        public async Task ResolveAsync_RepeatedCall_WithDeterministicFake_ProducesSameDecision()
+        {
+            var rerankResult = new CandidateRerankResult(
+                CandidateRerankDecision.Selected,
+                SelectedCandidateIndex: 1,
+                Confidence: 0.9,
+                Ranking: [new RerankedCandidateScore(1, 0.90), new RerankedCandidateScore(0, 0.20)],
+                Reason: "O produto é um calçado esportivo para corrida, não uma modalidade esportiva.");
+
+            for (var i = 0; i < 5; i++)
+            {
+                var reranker = FakeCandidateReranker.Returning(rerankResult);
+
+                var (resolver, catalogReader, semanticSearch, _, _) = CreateSut(
+                    minimumSimilarity: 0.10,
+                    minimumScoreMargin: 0.50,
+                    alwaysRerankSemanticMatches: true,
+                    reranker: reranker);
+
+                catalogReader.Add(new GoogleCategoryCatalogEntry(1065, "Tênis", "Artigos esportivos > Artigos para prática de esportes > Tênis", 3, true, true));
+                catalogReader.Add(new GoogleCategoryCatalogEntry(187, "Sapatos", "Vestuário e acessórios > Sapatos", 2, true, true));
+
+                semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(1065, "Tênis", 0.50));
+                semanticSearch.AddCandidate(new GoogleCategorySemanticCandidate(187, "Sapatos", 0.42));
+
+                var result = await resolver.ResolveAsync(
+                    new ResolveGoogleCategoryRequest(
+                        RawCategoryHint: "tênis para corrida",
+                        SemanticQuery: "calçado esportivo masculino para corrida",
+                        CategorySearchQuery: "sapatos esportivos para corrida"),
+                    CancellationToken.None);
+
+                Assert.Equal(187, result.GoogleCategoryId);
+                Assert.Equal(ResolutionStrategy.Reranked, result.Strategy);
+            }
         }
     }

@@ -169,7 +169,7 @@ public sealed class SqlGoogleTaxonomyRepositoryTests : IAsyncLifetime
 
         await _repository.SynchronizeAsync(SampleCategories(), "en-US", "https://example.com/taxonomy.txt", DateTime.UtcNow, CancellationToken.None);
 
-        await using var command = new SqlCommand("SELECT COUNT(*) FROM GoogleTaxonomyImports WHERE Status = 'Completed'", connection);
+        await using var command = new SqlCommand("SELECT COUNT(*) FROM Integration.GoogleTaxonomyImports WHERE Status = 'Completed'", connection);
         var count = (int)(await command.ExecuteScalarAsync())!;
 
         Assert.Equal(1, count);
