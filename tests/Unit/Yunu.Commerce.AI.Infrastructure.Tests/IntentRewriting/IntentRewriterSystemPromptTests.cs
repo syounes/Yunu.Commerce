@@ -92,10 +92,35 @@ public sealed class IntentRewriterSystemPromptTests
         Assert.Contains(
             "produto novo e com peso para entrega de 2 kg",
             IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"finalidade de uso\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"ocasião\"", IntentRewriterSystemPrompt.Text);
         Assert.Contains("\"rawName\": \"condição\"", IntentRewriterSystemPrompt.Text);
         Assert.Contains("\"rawName\": \"peso para entrega\"", IntentRewriterSystemPrompt.Text);
         Assert.Contains("\"rawValue\": \"2 kg\"", IntentRewriterSystemPrompt.Text);
+    }
+
+    [Fact]
+    public void Prompt_contains_fact_preservation_fundamental_rule()
+    {
+        Assert.Contains("REGRA FUNDAMENTAL DE PRESERVAÇÃO DOS FATOS", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("nunca devem ser aplicadas globalmente", NormalizedText);
+    }
+
+    [Fact]
+    public void Prompt_contains_occasion_extraction_rule_with_canonical_rawName()
+    {
+        Assert.Contains("REGRA DE OCASIÃO E FINALIDADE DE USO", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("rawName = \"ocasião\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"corrida\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"festa\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"academia\" }", IntentRewriterSystemPrompt.Text);
+    }
+
+    [Fact]
+    public void Prompt_contains_para_disambiguation_rule_between_occasion_and_compatibility()
+    {
+        Assert.Contains("DIFERENCIAÇÃO SEMÂNTICA DE EXPRESSÕES COM \"PARA\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"compatibilidade\", \"rawValue\": \"iPhone\" }", NormalizedText);
+        Assert.Contains("não invente ocasião", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
@@ -208,7 +233,7 @@ public sealed class IntentRewriterSystemPromptTests
     [Fact]
     public void Prompt_is_versioned_v6()
     {
-        Assert.Equal("v6", IntentRewriterSystemPrompt.Version);
+        Assert.Equal("v7", IntentRewriterSystemPrompt.Version);
     }
 
     [Fact]
