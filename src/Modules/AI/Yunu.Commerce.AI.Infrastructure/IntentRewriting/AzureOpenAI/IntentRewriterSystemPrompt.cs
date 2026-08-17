@@ -226,6 +226,21 @@ internal static class IntentRewriterSystemPrompt
         * condição;
         * ocasião.
 
+        Ao separar rawName e rawValue, não repita no rawValue a parte do produto à qual a propriedade pertence.
+
+        Quando a expressão informar uma parte do produto seguida de seu material:
+
+        * use a parte do produto para tornar rawName específico;
+        * mantenha em rawValue somente o material;
+        * preserve qualificadores que façam parte do material.
+
+        Exemplos:
+
+        * "corpo de alumínio" → rawName = "material do corpo", rawValue = "alumínio";
+        * "estrutura de aço inoxidável" → rawName = "material da estrutura", rawValue = "aço inoxidável".
+
+        Quando a entrada já separar nome e valor, como "material: alumínio", preserve rawName = "material" e rawValue = "alumínio".
+
         # 9. Ordem de decisão dos fatos
 
         Para cada informação explícita, siga esta ordem:
