@@ -11,7 +11,7 @@ public sealed class CreateBrandHandler
         _repository = repository;
     }
 
-    public async Task<BrandId> Handle(CreateBrandCommand command, CancellationToken cancellationToken)
+    public async Task<CreateBrandResult> HandleAsync(CreateBrandCommand command, CancellationToken cancellationToken)
     {
         var code = new BrandCode(command.Code);
         if (await _repository.ExistsCodeAsync(code, cancellationToken))
@@ -25,6 +25,6 @@ public sealed class CreateBrandHandler
 
         await _repository.AddAsync(brand, cancellationToken);
 
-        return id;
+        return new CreateBrandResult { BrandId = id.Value };
     }
 }

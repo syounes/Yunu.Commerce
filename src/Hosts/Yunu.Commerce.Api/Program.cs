@@ -11,6 +11,7 @@ using Yunu.Commerce.Api.AI.IntentRewriting;
 using Yunu.Commerce.Api.AI.AttributeResolution;
 using Yunu.Commerce.Api.AI.CategoryResolution;
 using Yunu.Commerce.Api.AI.CatalogIntentResolution;
+using Yunu.Commerce.Api.Brands;
 using Yunu.Commerce.Sellers.Application;
 using Yunu.Commerce.Sellers.Infrastructure;
 using Yunu.Commerce.Offers.Application;
@@ -101,5 +102,6 @@ app.MapIntentRewritingEndpoints();
 app.MapResolveAttributeHintsEndpoints();
 app.MapResolveGoogleCategoryEndpoints();
 app.MapCatalogIntentResolutionEndpoints();
+    app.MapCatalogBrandEndpoints();
 
 app.Run();

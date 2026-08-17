@@ -2,6 +2,10 @@
 
 namespace Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
 
+/// <summary>
+/// Deterministic Brand resolver (docs/domains/catalog.md §12 — no AI, no aliases,
+/// no auto-creation). Resolution order: exact BrandCode, then exact NormalizedName.
+/// </summary>
 public sealed class BrandResolver : IBrandResolver
 {
     private readonly IBrandRepository _repository;
@@ -25,35 +29,12 @@ public sealed class BrandResolver : IBrandResolver
             var byCode = await _repository.GetByCodeAsync(code, cancellationToken);
             if (byCode != null) return byCode;
         }
-        catch
+        catch (ArgumentException)
         {
             // not a valid code, continue to normalized name resolution
         }
 
-        var normalized = Normalize(input);
+        var normalized = Brand.ComputeNormalizedName(input);
         return await _repository.FindByNormalizedNameAsync(normalized, cancellationToken);
-    }
-
-    private static string Normalize(string name)
-    {
-        var trimmed = name.Trim();
-        var normalized = System.Text.RegularExpressions.Regex.Replace(RemoveDiacritics(trimmed), "\\s+", " ");
-        return normalized.ToUpperInvariant();
-    }
-
-    private static string RemoveDiacritics(string text)
-    {
-        var normalized = text.Normalize(System.Text.NormalizationForm.FormD);
-        var sb = new System.Text.StringBuilder();
-        foreach (var c in normalized)
-        {
-            var uc = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
-            if (uc != System.Globalization.UnicodeCategory.NonSpacingMark)
-            {
-                sb.Append(c);
-            }
-        }
-
-        return sb.ToString().Normalize(System.Text.NormalizationForm.FormC);
     }
 }

@@ -14,6 +14,10 @@ using Yunu.Commerce.Catalog.Application.ProductProposals;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
+using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
+using Yunu.Commerce.Catalog.Application.Brands.GetBrand;
+using Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
+using Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
 
 namespace Yunu.Commerce.Catalog.Application;
 
@@ -31,6 +35,11 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateSkuHandler>();
         services.AddScoped<GetSkuByIdHandler>();
         services.AddScoped<GetSkusByProductIdHandler>();
+
+        services.AddScoped<CreateBrandHandler>();
+        services.AddScoped<GetBrandHandler>();
+        services.AddScoped<UpdateBrandHandler>();
+        services.AddScoped<Yunu.Commerce.Catalog.Application.Brands.ResolveBrand.IBrandResolver, Yunu.Commerce.Catalog.Application.Brands.ResolveBrand.BrandResolver>();
 
         services.AddScoped<CreateProductProposalHandler>();
         services.AddScoped<GetProductProposalByIdHandler>();

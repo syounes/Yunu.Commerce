@@ -14,11 +14,35 @@ public sealed class SqlBrandRepository : IBrandRepository
         _connectionString = options.Value.ConnectionString;
     }
 
+    public async Task UpdateAsync(Brand brand, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE Catalog.Brands
+            SET Name = @Name,
+                NormalizedName = @NormalizedName,
+                Status = @Status,
+                UpdatedAt = @UpdatedAt
+            WHERE BrandId = @BrandId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@Name", brand.Name.Value);
+        command.Parameters.AddWithValue("@NormalizedName", brand.NormalizedName);
+        command.Parameters.AddWithValue("@Status", brand.Status.ToString());
+        command.Parameters.AddWithValue("@UpdatedAt", DateTimeOffset.UtcNow);
+        command.Parameters.AddWithValue("@BrandId", brand.Id.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task AddAsync(Brand brand, CancellationToken cancellationToken)
     {
         const string sql = """
-            INSERT INTO Catalog.Brands (BrandId, Code, Name, NormalizedName, Status, CreatedAtUtc)
-            VALUES (@BrandId, @Code, @Name, @NormalizedName, @Status, @CreatedAtUtc)
+            INSERT INTO Catalog.Brands (BrandId, Code, Name, NormalizedName, Status, CreatedAt)
+            VALUES (@BrandId, @Code, @Name, @NormalizedName, @Status, @CreatedAt)
             """;
 
         await using var connection = new SqlConnection(_connectionString);
@@ -30,7 +54,7 @@ public sealed class SqlBrandRepository : IBrandRepository
         command.Parameters.AddWithValue("@Name", brand.Name.Value);
         command.Parameters.AddWithValue("@NormalizedName", brand.NormalizedName);
         command.Parameters.AddWithValue("@Status", brand.Status.ToString());
-        command.Parameters.AddWithValue("@CreatedAtUtc", brand.CreatedAtUtc);
+        command.Parameters.AddWithValue("@CreatedAt", brand.CreatedAtUtc);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -38,7 +62,7 @@ public sealed class SqlBrandRepository : IBrandRepository
     public async Task<Brand?> GetByIdAsync(BrandId id, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAtUtc
+            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAt
             FROM Catalog.Brands
             WHERE BrandId = @BrandId
             """;
@@ -58,7 +82,7 @@ public sealed class SqlBrandRepository : IBrandRepository
     public async Task<Brand?> GetByCodeAsync(BrandCode code, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAtUtc
+            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAt
             FROM Catalog.Brands
             WHERE Code = @Code
             """;
@@ -78,7 +102,7 @@ public sealed class SqlBrandRepository : IBrandRepository
     public async Task<Brand?> FindByNormalizedNameAsync(string normalizedName, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAtUtc
+            SELECT BrandId, Code, Name, NormalizedName, Status, CreatedAt
             FROM Catalog.Brands
             WHERE NormalizedName = @NormalizedName
             """;
@@ -118,7 +142,7 @@ public sealed class SqlBrandRepository : IBrandRepository
         var name = reader.GetString(2);
         var normalized = reader.GetString(3);
         var status = reader.GetString(4);
-        var createdAt = reader.GetDateTimeOffset(5);
+        var createdAt = ReadDateTimeOffset(reader, 5);
 
         var brand = Brand.Reconstitute(
             new BrandId(brandId),
@@ -129,5 +153,25 @@ public sealed class SqlBrandRepository : IBrandRepository
             createdAt);
 
         return brand;
+    }
+
+    /// <summary>
+    /// Reads a timestamp column as <see cref="DateTimeOffset"/> regardless of whether the
+    /// underlying SQL Server column type is DATETIMEOFFSET or a plain DATETIME/DATETIME2.
+    /// <see cref="SqlDataReader.GetDateTimeOffset"/> throws <see cref="InvalidCastException"/>
+    /// when the column value is a plain <see cref="DateTime"/>; values read that way are
+    /// treated as UTC, matching the CreatedAt/UpdatedAt convention (physical column names;
+    /// values still represent UTC instants).
+    /// </summary>
+    private static DateTimeOffset ReadDateTimeOffset(SqlDataReader reader, int ordinal)
+    {
+        var fieldType = reader.GetFieldType(ordinal);
+        if (fieldType == typeof(DateTimeOffset))
+        {
+            return reader.GetDateTimeOffset(ordinal);
+        }
+
+        var dateTime = reader.GetDateTime(ordinal);
+        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc));
     }
 }
