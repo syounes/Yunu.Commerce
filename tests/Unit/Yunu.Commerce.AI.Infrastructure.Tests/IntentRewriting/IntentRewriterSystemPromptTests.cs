@@ -30,233 +30,159 @@ public sealed class IntentRewriterSystemPromptTests
     }
 
     [Fact]
-    public void Prompt_forbids_official_category_ids()
+    public void Prompt_forbids_official_ids()
     {
-        Assert.Contains("Nunca escolha ou produza identificadores oficiais", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Nunca produza IDs oficiais de categoria, atributo, opção, produto ou SKU", IntentRewriterSystemPrompt.Text);
+    }
+
+    [Fact]
+    public void Prompt_forbids_inventing_information()
+    {
+        Assert.Contains("Nunca invente informações", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_contains_disambiguation_rule_for_ambiguous_terms()
     {
-        Assert.Contains("desambiguar", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("sapatos esportivos para corrida", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Desambigue palavras com mais de um significado", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("sapatos esportivos", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_scopes_removal_rules_exclusively_to_categorySearchQuery()
     {
-        Assert.Contains("aplica-se EXCLUSIVAMENTE", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("categorySearchQuery", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Remova exclusivamente de categorySearchQuery", IntentRewriterSystemPrompt.Text);
+        Assert.Contains(
+            "Essa remoção vale somente para categorySearchQuery. Os mesmos fatos devem",
+            IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_instructs_attributeHints_to_capture_all_explicit_facts()
     {
-        Assert.Contains("TODOS os fatos explícitos", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Extraia todos os fatos comerciais explicitamente informados", IntentRewriterSystemPrompt.Text);
         Assert.Contains("condição", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("peso para entrega", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("peso para frete", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Prompt_forbids_omitting_logistics_facts_from_attributeHints()
+    public void Prompt_forbids_vague_rawNames()
     {
-        Assert.Contains("dado logístico", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(
-            "Nunca omita um fato de attributeHints apenas porque ele",
-            IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Evite nomes vagos como", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("tipo de teclado", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("tipo de microfone", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("tipo de conexão", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_states_same_fact_can_appear_in_both_categorySearchQuery_and_attributeHints()
+    public void Prompt_contains_fact_decision_order_rule()
     {
-        Assert.Contains("também foi usado como qualificador", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_instructs_semanticQuery_to_preserve_condition_and_shipping_weight()
-    {
-        Assert.Contains(
-            "semanticQuery NUNCA deve perder fatos relevantes",
-            IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_forbids_inventing_absent_facts()
-    {
-        Assert.Contains("Nunca invente um fato que o usuário não mencionou", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_contains_full_running_shoes_regression_example()
-    {
-        Assert.Contains(
-            "produto novo e com peso para entrega de 2 kg",
-            IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"ocasião\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"condição\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"peso para entrega\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawValue\": \"2 kg\"", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_contains_fact_preservation_fundamental_rule()
-    {
-        Assert.Contains("REGRA FUNDAMENTAL DE PRESERVAÇÃO DOS FATOS", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("nunca devem ser aplicadas globalmente", NormalizedText);
+        Assert.Contains("# 9. Ordem de decisão dos fatos", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Nunca descarte uma propriedade apenas porque ela também aparece em", NormalizedText);
     }
 
     [Fact]
     public void Prompt_contains_occasion_extraction_rule_with_canonical_rawName()
     {
-        Assert.Contains("REGRA DE OCASIÃO E FINALIDADE DE USO", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("rawName = \"ocasião\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"corrida\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"festa\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"ocasião\", \"rawValue\": \"academia\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("# 10. Ocasião e finalidade", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("ocasião = corrida", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("ocasião = festa", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("ocasião = academia", IntentRewriterSystemPrompt.Text);
+        Assert.Contains(
+            "Não omita ocasião apenas porque a finalidade foi usada na identificação",
+            NormalizedText);
     }
 
     [Fact]
-    public void Prompt_contains_para_disambiguation_rule_between_occasion_and_compatibility()
+    public void Prompt_contains_compatibility_rule_and_distinguishes_from_occasion()
     {
-        Assert.Contains("DIFERENCIAÇÃO SEMÂNTICA DE EXPRESSÕES COM \"PARA\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"compatibilidade\", \"rawValue\": \"iPhone\" }", NormalizedText);
-        Assert.Contains("não invente ocasião", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("# 11. Compatibilidade", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("compatibilidade = iPhone 15", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Não trate compatibilidade como ocasião", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_instructs_decomposing_compound_attributes_into_atomic_hints()
     {
-        Assert.Contains("attributeHint SEPARADO para CADA atributo atômico", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("produza um único hint chamado \"dimensões da embalagem\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("# 13. Atributos compostos", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Separe propriedades diferentes que aparecem na mesma expressão", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"comprimento da embalagem\", \"rawValue\": \"34 cm\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"largura da embalagem\", \"rawValue\": \"22 cm\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"altura da embalagem\", \"rawValue\": \"12 cm\"", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_instructs_semanticQuery_to_preserve_full_product_context_never_simplified()
+    public void Prompt_forbids_splitting_number_and_unit()
     {
-        Assert.Contains("apenas categorySearchQuery deve ser simplificada", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("NUNCA deve ser simplificada dessa forma", NormalizedText);
+        Assert.Contains("Não separe número e unidade", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("620 g permanece um único valor", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_contains_full_microphone_compound_dimensions_regression_example()
+    public void Prompt_forbids_fragmenting_indivisible_values()
     {
-        Assert.Contains("microfone condensador USB preto", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"comprimento da embalagem\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"largura da embalagem\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"altura da embalagem\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"rawName\": \"tipo de conexão\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("categorySearchQuery: \"microfones\"", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_instructs_extracting_technical_qualifiers_even_when_present_in_other_fields()
-    {
-        Assert.Contains("Extraia também qualificadores técnicos explícitos do produto como", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("attributeHint próprio com rawName", NormalizedText);
-        Assert.Contains("contextual e específico (ex.: { \"rawName\": \"tipo de microfone\", \"rawValue\": \"condensador\" }), além de continuar aparecendo em categoryHint", NormalizedText);
-        Assert.Contains("deduplique um fato removendo-o de attributeHints", NormalizedText);
-    }
-
-    [Fact]
-    public void Prompt_instructs_contextual_specific_rawNames_and_forbids_bare_tipo()
-    {
-        Assert.Contains("nunca uma palavra vaga", IntentRewriterSystemPrompt.Text, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\"tipo\" (prefira \"tipo de teclado\", \"tipo de microfone\", \"tipo de conexão\"", NormalizedText);
-        Assert.Contains("nunca a implemente mentalmente como uma", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Não fragmente valores semanticamente indivisíveis", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("USB-C", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Wi-Fi", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_forbids_artificial_booleans_for_mode_expressions()
     {
-        Assert.Contains("Não converta expressões que já carregam o valor semântico da opção em", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Não transforme valores semanticamente importantes em booleanos", IntentRewriterSystemPrompt.Text);
         Assert.Contains("{ \"rawName\": \"modo de conexão\", \"rawValue\": \"com fio\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("nunca { \"rawName\": \"com fio\", \"rawValue\": \"sim\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("{ \"rawName\": \"com fio\", \"rawValue\": \"sim\" }", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_contains_category_identity_rule_excluding_para_computador_as_attribute()
+    public void Prompt_separates_product_and_logistics_weight_dimensions()
     {
-        Assert.Contains("REGRA DE IDENTIDADE DE CATEGORIA", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("\"para computador\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("então NÃO deve gerar um attributeHint como { \"rawName\": \"uso\", \"rawValue\": \"para computador\" }", NormalizedText);
+        Assert.Contains("# 14. Pesos e dimensões", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("peso do produto = 620 g", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("peso para frete = 850 g", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_contains_operational_instruction_exclusion_rule_and_single_sku_example()
+    public void Prompt_contains_operational_instruction_exclusion_section()
     {
-        Assert.Contains("REGRA DE EXCLUSÃO DE INSTRUÇÕES OPERACIONAIS", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("attributeHints: \"deve possuir um único SKU\"", NormalizedText);
-        Assert.Contains("NUNCA deve gerar um attributeHint", NormalizedText);
+        Assert.Contains("# 3. Instruções operacionais", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Não transforme quantidade solicitada de SKUs em atributo", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("crie um único SKU", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
     public void Prompt_distinguishes_commercial_quantity_from_sku_creation_instruction()
     {
-        Assert.Contains("pacote com 3 camisetas", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("quantidade por embalagem", NormalizedText);
-        Assert.Contains("criar um único SKU\" para esse pacote", NormalizedText);
-        Assert.Contains("instrução sobre SKU continua sendo ignorada", NormalizedText);
+        Assert.Contains("pacote com 3 unidades", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("fato comercial, extrair quantidade por embalagem", NormalizedText);
     }
 
     [Fact]
-    public void Prompt_contains_full_keyboard_regression_example_with_expected_hints()
+    public void Prompt_contains_full_running_shoes_regression_example()
     {
-        Assert.Contains("teclado mecânico para computador", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("categorySearchQuery: \"teclados mecânicos\"", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"tipo de teclado\", \"rawValue\": \"mecânico\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"modo de conexão\", \"rawValue\": \"com fio\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"peso para entrega\", \"rawValue\": \"1,2 kg\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"comprimento da embalagem\", \"rawValue\": \"45 cm\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"largura da embalagem\", \"rawValue\": \"18 cm\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"altura da embalagem\", \"rawValue\": \"6 cm\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("# 15. Exemplo completo obrigatório", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("tênis feminino para corrida", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"ocasião\", \"rawValue\": \"corrida\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"condição\", \"rawValue\": \"novo\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"peso do produto\", \"rawValue\": \"620 g\"", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("\"rawName\": \"peso para frete\", \"rawValue\": \"850 g\"", IntentRewriterSystemPrompt.Text);
         Assert.Contains(
-            "NÃO produza: \"tipo\" = \"mecânico\"; \"uso\" ou \"ocasião\" = \"para computador\"; \"com fio\" = \"sim\"; \"SKU\" = \"único\"; \"title\" = \"único\".",
-            NormalizedText);
-        Assert.Contains("attributeHint, nem como \"SKU\", nem como \"title\", nem como", NormalizedText);
+            "A instrução \"somente uma variação de SKU\" deve ser ignorada porque não",
+            IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_contains_tshirt_and_microphone_scenarios_with_contextual_rawNames()
+    public void Prompt_contains_final_verification_checklist()
     {
-        Assert.Contains("camiseta masculina preta, tamanho M, de algodão e produto novo", NormalizedText);
-        Assert.Contains("- { \"rawName\": \"gênero\", \"rawValue\": \"masculino\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("- { \"rawName\": \"tipo de microfone\", \"rawValue\": \"condensador\" }", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("# 16. Verificação antes da resposta", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("nenhuma informação foi inventada", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("nenhum ID oficial foi produzido", IntentRewriterSystemPrompt.Text);
+        Assert.Contains("Retorne somente o JSON compatível com o schema fornecido", IntentRewriterSystemPrompt.Text);
     }
 
     [Fact]
-    public void Prompt_contains_explicit_compatibility_example()
+    public void Prompt_is_versioned_v8()
     {
-        Assert.Contains("capa compatível com iPhone 15", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"compatibilidade\", \"rawValue\": \"iPhone 15\" }", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_is_versioned_v6()
-    {
-        Assert.Equal("v7", IntentRewriterSystemPrompt.Version);
-    }
-
-    [Fact]
-    public void Prompt_instructs_one_property_per_attributeHint_with_decomposition_examples()
-    {
-        Assert.Contains(
-            "Cada attributeHint deve representar exatamente uma propriedade independente",
-            NormalizedText);
-        Assert.Contains("tamanho 38 no sistema brasileiro", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"sistema de tamanho\", \"rawValue\": \"brasileiro\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("SSD de 1 TB", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"tipo de armazenamento\", \"rawValue\": \"SSD\" }", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("{ \"rawName\": \"armazenamento\", \"rawValue\": \"1 TB\" }", IntentRewriterSystemPrompt.Text);
-    }
-
-    [Fact]
-    public void Prompt_forbids_splitting_number_from_unit_and_atomic_semantic_values()
-    {
-        Assert.Contains(
-            "NÃO decomponha um número e sua unidade de medida",
-            NormalizedText);
-        Assert.Contains("620 g", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("USB-C", IntentRewriterSystemPrompt.Text);
-        Assert.Contains("Wi-Fi", IntentRewriterSystemPrompt.Text);
+        Assert.Equal("v8", IntentRewriterSystemPrompt.Version);
     }
 }
