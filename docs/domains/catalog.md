@@ -264,7 +264,6 @@ Category may support hierarchy.
 Potential concepts:
 
 ```text
-CategoryId
 Name
 ParentCategoryId
 Status

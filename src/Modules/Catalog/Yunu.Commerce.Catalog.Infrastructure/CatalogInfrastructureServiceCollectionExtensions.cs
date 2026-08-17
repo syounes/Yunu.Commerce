@@ -23,6 +23,8 @@ using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Synchronization.InMemory;
+using Yunu.Commerce.Catalog.Infrastructure.Brands.SqlServer;
+using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;
@@ -86,6 +88,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IGoogleCategoryCatalogReader, SqlGoogleCategoryCatalogReader>();
         services.AddSingleton<IGoogleCategorySemanticSearch, PostgreSqlGoogleCategorySemanticSearch>();
+        services.AddSingleton<IBrandRepository, SqlBrandRepository>();
 
         return services;
     }
