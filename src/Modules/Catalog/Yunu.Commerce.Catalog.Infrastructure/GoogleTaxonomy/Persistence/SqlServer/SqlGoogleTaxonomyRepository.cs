@@ -13,7 +13,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlSer
 /// here would add unjustified complexity (docs §38, "avoid unnecessary abstractions").
 ///
 /// Persists to [Catalog].[GoogleTaxonomyCategories] and [Integration].[GoogleTaxonomyImports]
-/// (deploy/sql/001-google-taxonomy-tables.sql). Synchronization never issues a
+/// (deploy/databases/sqlserver/001-google-taxonomy-tables.sql). Synchronization never issues a
 /// bulk DELETE; existing rows are upserted and rows absent from the current feed
 /// are marked IsActive = 0 (docs task: "Synchronization behavior").
 /// </summary>

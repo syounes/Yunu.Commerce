@@ -10,7 +10,7 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// <summary>
 /// Integration tests for SqlGoogleTaxonomyRepository against a real SQL Server
 /// instance via Testcontainers (docs task: "Create SQL migration/setup scripts").
-/// The schema is created by executing deploy/sql/001-google-taxonomy-tables.sql
+/// The schema is created by executing deploy/databases/sqlserver/001-google-taxonomy-tables.sql
 /// directly against the container, matching the repository's own conventions
 /// (no ORM/migration framework is introduced for this feature).
 /// </summary>
@@ -46,7 +46,7 @@ public sealed class SqlGoogleTaxonomyRepositoryTests : IAsyncLifetime
         var scriptPath = Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..", "..",
-            "deploy", "sql", "001-google-taxonomy-tables.sql");
+            "deploy", "databases", "sqlserver", "001-google-taxonomy-tables.sql");
 
         var script = await File.ReadAllTextAsync(Path.GetFullPath(scriptPath));
 

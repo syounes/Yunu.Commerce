@@ -4,7 +4,7 @@
 /// Typed, deterministic result of parsing a free-text rawValue according to
 /// an Attribute Definition's DataType (docs task: "Semantic attribute hint
 /// resolution" - typed attribute value preservation). Mirrors the shape of
-/// Catalog.SkuAttributeValues (deploy/sql/002_create_sku_attribute_catalog.sql)
+/// Catalog.SkuAttributeValues (deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql)
 /// so a future mapper to CatalogProductProposal/SkuAttributeValues can consume
 /// this directly without reparsing RawValue/NormalizedValue.
 ///

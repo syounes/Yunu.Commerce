@@ -41,7 +41,6 @@ public class CreateProductHandlerTests
         {
             Name = "Apple iPhone 17 Pro",
             BrandId = Guid.NewGuid(),
-            FamilyId = Guid.NewGuid(),
             GoogleCategoryId = ValidGoogleCategoryId
         };
 
@@ -69,7 +68,6 @@ public class CreateProductHandlerTests
             Name = "YUNU Runner",
             Description = "Tênis esportivo masculino para corrida e uso diário.",
             BrandId = Guid.NewGuid(),
-            FamilyId = Guid.NewGuid(),
             GoogleCategoryId = ValidGoogleCategoryId
         };
 
@@ -91,7 +89,6 @@ public class CreateProductHandlerTests
         {
             Name = "Apple iPhone 17 Pro",
             BrandId = Guid.NewGuid(),
-            FamilyId = Guid.NewGuid(),
             GoogleCategoryId = ValidGoogleCategoryId
         };
 
@@ -113,7 +110,6 @@ public class CreateProductHandlerTests
         {
             Name = "Apple iPhone 17 Pro",
             BrandId = null,
-            FamilyId = Guid.NewGuid(),
             GoogleCategoryId = ValidGoogleCategoryId
         };
 
@@ -122,51 +118,6 @@ public class CreateProductHandlerTests
         var stored = await repository.GetByIdAsync(new Yunu.Commerce.Catalog.Domain.Products.ProductId(result.ProductId), CancellationToken.None);
         Assert.NotNull(stored);
         Assert.Null(stored!.BrandId);
-    }
-
-    [Fact]
-    public async Task Handle_With_Null_FamilyId_Should_Persist_Null_FamilyId()
-    {
-        var repository = new FakeProductRepository();
-        var googleTaxonomyRepository = CreateGoogleTaxonomyRepository();
-        var handler = new CreateProductHandler(repository, googleTaxonomyRepository);
-
-        var command = new CreateProductCommand
-        {
-            Name = "Apple iPhone 17 Pro",
-            BrandId = Guid.NewGuid(),
-            FamilyId = null,
-            GoogleCategoryId = ValidGoogleCategoryId
-        };
-
-        var result = await handler.HandleAsync(command, CancellationToken.None);
-
-        var stored = await repository.GetByIdAsync(new Yunu.Commerce.Catalog.Domain.Products.ProductId(result.ProductId), CancellationToken.None);
-        Assert.NotNull(stored);
-        Assert.Null(stored!.FamilyId);
-    }
-
-    [Fact]
-    public async Task Handle_With_Both_BrandId_And_FamilyId_Null_Should_Persist_Product()
-    {
-        var repository = new FakeProductRepository();
-        var googleTaxonomyRepository = CreateGoogleTaxonomyRepository();
-        var handler = new CreateProductHandler(repository, googleTaxonomyRepository);
-
-        var command = new CreateProductCommand
-        {
-            Name = "Apple iPhone 17 Pro",
-            BrandId = null,
-            FamilyId = null,
-            GoogleCategoryId = ValidGoogleCategoryId
-        };
-
-        var result = await handler.HandleAsync(command, CancellationToken.None);
-
-        var stored = await repository.GetByIdAsync(new Yunu.Commerce.Catalog.Domain.Products.ProductId(result.ProductId), CancellationToken.None);
-        Assert.NotNull(stored);
-        Assert.Null(stored!.BrandId);
-        Assert.Null(stored.FamilyId);
     }
 
     [Theory]
@@ -183,7 +134,6 @@ public class CreateProductHandlerTests
         {
             Name = name!,
             BrandId = Guid.NewGuid(),
-            FamilyId = Guid.NewGuid(),
             GoogleCategoryId = ValidGoogleCategoryId
         };
 
@@ -203,27 +153,6 @@ public class CreateProductHandlerTests
         {
             Name = "Valid Name",
             BrandId = Guid.Empty,
-            FamilyId = Guid.NewGuid(),
-            GoogleCategoryId = ValidGoogleCategoryId
-        };
-
-        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(command, CancellationToken.None));
-
-        Assert.Equal(0, repository.AddAsyncCallCount);
-    }
-
-    [Fact]
-    public async Task Handle_With_Empty_FamilyId_Should_Throw_And_Not_Persist()
-    {
-        var repository = new FakeProductRepository();
-        var googleTaxonomyRepository = CreateGoogleTaxonomyRepository();
-        var handler = new CreateProductHandler(repository, googleTaxonomyRepository);
-
-        var command = new CreateProductCommand
-        {
-            Name = "Valid Name",
-            BrandId = Guid.NewGuid(),
-            FamilyId = Guid.Empty,
             GoogleCategoryId = ValidGoogleCategoryId
         };
 

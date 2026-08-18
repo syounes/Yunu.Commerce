@@ -3,7 +3,7 @@
 /// <summary>
 /// SQL Server read model for a Google Taxonomy category entry used by
 /// resolution (GoogleTaxonomyCategories,
-/// deploy/sql/001-google-taxonomy-tables.sql). Distinct from <see
+/// deploy/databases/sqlserver/001-google-taxonomy-tables.sql). Distinct from <see
 /// cref="Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GoogleTaxonomyCategoryResponse"/>,
 /// which is the public query read model; this entry is scoped internally to
 /// category hint resolution.

@@ -37,7 +37,6 @@ public static class CatalogProductEndpoints
                 Name = request.Name,
                 Description = request.Description,
                 BrandId = request.BrandId,
-                FamilyId = request.FamilyId,
                 GoogleCategoryId = request.GoogleCategoryId
             };
 

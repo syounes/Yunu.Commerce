@@ -35,7 +35,6 @@ internal static class ProductProposalMapper
                 SuggestedName = proposal.Product.SuggestedName,
                 Description = proposal.Product.Description,
                 BrandId = proposal.Product.BrandId,
-                FamilyId = proposal.Product.FamilyId,
                 GoogleCategory = new ProposedGoogleCategoryMongoModel
                 {
                     GoogleCategoryId = proposal.Product.GoogleCategory.GoogleCategoryId,
@@ -82,7 +81,6 @@ internal static class ProductProposalMapper
                 model.Product.SuggestedName,
                 model.Product.Description,
                 model.Product.BrandId,
-                model.Product.FamilyId,
                 new ProposedGoogleCategory(
                     model.Product.GoogleCategory.GoogleCategoryId,
                     model.Product.GoogleCategory.Name,

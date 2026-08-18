@@ -1,6 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Products.CreateProduct;
@@ -36,11 +35,10 @@ public sealed class CreateProductHandler
         var productId = ProductId.New();
         var name = new ProductName(command.Name);
         var brandId = command.BrandId is { } brandIdValue ? new BrandId(brandIdValue) : (BrandId?)null;
-        var familyId = command.FamilyId is { } familyIdValue ? new FamilyId(familyIdValue) : (FamilyId?)null;
 
         var googleCategory = await ResolveGoogleCategoryAsync(command.GoogleCategoryId, cancellationToken);
 
-        var product = Product.Create(productId, name, command.Description, brandId, familyId, googleCategory);
+        var product = Product.Create(productId, name, command.Description, brandId, googleCategory);
 
         await _productRepository.AddAsync(product, cancellationToken);
 

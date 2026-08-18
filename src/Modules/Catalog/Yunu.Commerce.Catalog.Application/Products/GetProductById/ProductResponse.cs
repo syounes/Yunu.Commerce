@@ -15,8 +15,6 @@ public sealed class ProductResponse
 
     public Guid? BrandId { get; init; }
 
-    public Guid? FamilyId { get; init; }
-
     public required GoogleCategoryResponse GoogleCategory { get; init; }
 
     public required string Status { get; init; }

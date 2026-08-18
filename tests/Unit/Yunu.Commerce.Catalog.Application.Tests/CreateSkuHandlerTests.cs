@@ -2,7 +2,6 @@
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
@@ -21,7 +20,6 @@ public class CreateSkuHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             new BrandId(Guid.NewGuid()),
-            new FamilyId(Guid.NewGuid()),
             CreateGoogleCategory());
 
         productRepository.AddAsync(product, CancellationToken.None).GetAwaiter().GetResult();

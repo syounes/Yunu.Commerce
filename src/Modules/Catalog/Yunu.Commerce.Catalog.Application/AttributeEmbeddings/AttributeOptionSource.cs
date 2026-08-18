@@ -5,7 +5,7 @@
 /// Definition is also active, used as the source for semantic embedding
 /// generation (docs task: "SKU attribute embedding synchronization pipeline").
 /// Decoupled from the SQL Server row shape (Catalog.AttributeOptions,
-/// deploy/sql/002_create_sku_attribute_catalog.sql).
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql).
 /// </summary>
 public sealed class AttributeOptionSource
 {

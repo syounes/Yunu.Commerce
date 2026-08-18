@@ -11,7 +11,7 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// Integration tests for SqlAttributeEmbeddingSourceRepository against a real
 /// SQL Server instance via Testcontainers (docs task: "SKU attribute embedding
 /// synchronization pipeline"). The schema is created by executing
-/// deploy/sql/002_create_sku_attribute_catalog.sql directly against the
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql directly against the
 /// container, matching the convention already established by
 /// SqlGoogleTaxonomyRepositoryTests.
 /// </summary>
@@ -47,7 +47,7 @@ public sealed class SqlAttributeEmbeddingSourceRepositoryTests : IAsyncLifetime
         var scriptPath = Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..", "..",
-            "deploy", "sql", "002_create_sku_attribute_catalog.sql");
+            "deploy", "databases", "sqlserver", "002_create_sku_attribute_catalog.sql");
 
         var script = await File.ReadAllTextAsync(Path.GetFullPath(scriptPath));
 

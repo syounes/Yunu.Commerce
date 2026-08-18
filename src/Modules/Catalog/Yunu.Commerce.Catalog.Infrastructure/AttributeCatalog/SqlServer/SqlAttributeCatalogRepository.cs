@@ -17,7 +17,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer;
 /// (<see cref="GoogleTaxonomySqlOptions"/>, section "Catalog:GoogleTaxonomySql")
 /// since Catalog.AttributeDefinitions / Catalog.AttributeOptions live in the
 /// same database as Catalog.GoogleTaxonomyCategories
-/// (deploy/sql/002_create_sku_attribute_catalog.sql); no second SQL Server
+/// (deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql); no second SQL Server
 /// configuration section is introduced.
 /// </summary>
 public sealed class SqlAttributeCatalogRepository : IAttributeCatalogRepository

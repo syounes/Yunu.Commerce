@@ -3,7 +3,7 @@
 /// <summary>
 /// Provenance of a Sku attribute assignment, mirroring the CHECK constraint on
 /// SQL Server Catalog.SkuAttributeValues.Source
-/// (deploy/sql/002_create_sku_attribute_catalog.sql). This task only assigns
+/// (deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql). This task only assigns
 /// attributes explicitly supplied by a caller (<see cref="User"/> or
 /// <see cref="Import"/>); AI/Google-sourced attribute interpretation is
 /// deferred (docs task: "SKU attribute foundation" - out of scope: AI, LLM,

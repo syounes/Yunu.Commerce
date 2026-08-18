@@ -1,4 +1,4 @@
-import type { ProductProposal } from "../models/productProposal";
+﻿import type { ProductProposal } from "../models/productProposal";
 
 export const productProposalMock: ProductProposal = {
   proposalId: "cf0bc3a3-f1e4-4b0c-898a-4c58045c3878",
@@ -17,7 +17,6 @@ export const productProposalMock: ProductProposal = {
     suggestedName: "Microfone condensador USB",
     description: "Corpo em alumínio para podcasts e gravações em estúdio.",
     brandId: null,
-    familyId: null,
     googleCategory: {
       googleCategoryId: 234,
       name: "Microfones",

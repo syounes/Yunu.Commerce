@@ -10,7 +10,7 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// Integration tests for PostgreSqlAttributeEmbeddingRepository against a real
 /// PostgreSQL + pgvector instance via Testcontainers (docs task: "SKU
 /// attribute embedding synchronization pipeline"). The schema is created by
-/// executing deploy/docker/postgres/init/003_create_sku_attribute_vectors.sql
+/// executing deploy/databases/postgres/003_create_sku_attribute_vectors.sql
 /// directly against the container.
 /// </summary>
 public sealed class PostgreSqlAttributeEmbeddingRepositoryTests : IAsyncLifetime
@@ -50,7 +50,7 @@ public sealed class PostgreSqlAttributeEmbeddingRepositoryTests : IAsyncLifetime
         var scriptPath = Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..", "..",
-            "deploy", "docker", "postgres", "init", "003_create_sku_attribute_vectors.sql");
+            "deploy", "databases", "postgres", "003_create_sku_attribute_vectors.sql");
 
         var script = await File.ReadAllTextAsync(Path.GetFullPath(scriptPath));
 

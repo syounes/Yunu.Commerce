@@ -46,7 +46,6 @@ public sealed class GetProductProposalByIdHandler
                 proposal.Product.SuggestedName,
                 proposal.Product.Description,
                 proposal.Product.BrandId,
-                proposal.Product.FamilyId,
                 new ProposedGoogleCategoryDto(
                     proposal.Product.GoogleCategory.GoogleCategoryId,
                     proposal.Product.GoogleCategory.Name,

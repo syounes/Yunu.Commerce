@@ -2,7 +2,7 @@
 
 /// <summary>
 /// SQL Server read model for an Attribute Definition used by resolution
-/// (Catalog.AttributeDefinitions, deploy/sql/002_create_sku_attribute_catalog.sql).
+/// (Catalog.AttributeDefinitions, deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql).
 /// </summary>
 public sealed record AttributeDefinitionCatalogEntry(
     int AttributeDefinitionId,
@@ -20,7 +20,7 @@ public sealed record AttributeDefinitionCatalogEntry(
 
 /// <summary>
 /// SQL Server read model for an Attribute Option used by resolution
-/// (Catalog.AttributeOptions, deploy/sql/002_create_sku_attribute_catalog.sql).
+/// (Catalog.AttributeOptions, deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql).
 /// </summary>
 public sealed record AttributeOptionCatalogEntry(
     int AttributeOptionId,
@@ -33,7 +33,7 @@ public sealed record AttributeOptionCatalogEntry(
 /// <summary>
 /// SQL Server read model for a Google category attribute rule
 /// (Catalog.GoogleCategoryAttributeRules,
-/// deploy/sql/002_create_sku_attribute_catalog.sql).
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql).
 /// </summary>
 public sealed record GoogleCategoryAttributeRuleEntry(
     long GoogleCategoryId,

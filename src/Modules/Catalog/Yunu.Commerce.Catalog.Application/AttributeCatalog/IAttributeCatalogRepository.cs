@@ -3,7 +3,7 @@
 /// <summary>
 /// Port for resolving SKU attribute reference data from SQL Server
 /// (Catalog.AttributeDefinitions, Catalog.AttributeOptions -
-/// deploy/sql/002_create_sku_attribute_catalog.sql). Catalog.Domain never
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql). Catalog.Domain never
 /// accesses SQL Server directly; the Application layer resolves and validates
 /// definitions/options through this port before asking the Sku Aggregate to
 /// assign an attribute (docs task: "SKU attribute foundation").

@@ -57,8 +57,6 @@ public sealed class ProposedProductResponse
 
     public Guid? BrandId { get; init; }
 
-    public Guid? FamilyId { get; init; }
-
     public required ProposedGoogleCategoryResponse GoogleCategory { get; init; }
 }
 

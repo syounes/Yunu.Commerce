@@ -11,7 +11,7 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// Integration tests for SqlAttributeCatalogRepository against a real SQL
 /// Server instance via Testcontainers (docs task: "SKU attribute foundation").
 /// The schema is created by executing
-/// deploy/sql/002_create_sku_attribute_catalog.sql directly against the
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql directly against the
 /// container, which also seeds the reference AttributeGroups/
 /// AttributeDefinitions/AttributeOptions rows used by these assertions.
 /// </summary>
@@ -46,7 +46,7 @@ public sealed class SqlAttributeCatalogRepositoryTests : IAsyncLifetime
         var scriptPath = Path.Combine(
             AppContext.BaseDirectory,
             "..", "..", "..", "..", "..", "..",
-            "deploy", "sql", "002_create_sku_attribute_catalog.sql");
+            "deploy", "databases", "sqlserver", "002_create_sku_attribute_catalog.sql");
 
         var script = await File.ReadAllTextAsync(Path.GetFullPath(scriptPath));
 

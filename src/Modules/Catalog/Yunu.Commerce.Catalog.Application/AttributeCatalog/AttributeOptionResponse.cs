@@ -3,7 +3,7 @@
 /// <summary>
 /// Dedicated read model for a Catalog Attribute Option, decoupled from the SQL
 /// Server row shape (Catalog.AttributeOptions,
-/// deploy/sql/002_create_sku_attribute_catalog.sql). Only used when the owning
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql). Only used when the owning
 /// Attribute Definition's DataType is Enum (docs task: "SKU attribute
 /// foundation").
 /// </summary>

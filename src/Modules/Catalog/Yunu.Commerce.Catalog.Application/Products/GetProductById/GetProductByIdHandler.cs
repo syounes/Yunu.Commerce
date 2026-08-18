@@ -43,7 +43,6 @@ public sealed class GetProductByIdHandler
             Name = product.Name.Value,
             Description = product.Description,
             BrandId = product.BrandId?.Value,
-            FamilyId = product.FamilyId?.Value,
             GoogleCategory = new GoogleCategoryResponse
             {
                 Id = product.GoogleCategory.Id,

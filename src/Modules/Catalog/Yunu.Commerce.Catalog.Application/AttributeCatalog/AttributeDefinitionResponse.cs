@@ -3,7 +3,7 @@
 /// <summary>
 /// Dedicated read model for a Catalog Attribute Definition, decoupled from the
 /// SQL Server row shape (Catalog.AttributeDefinitions,
-/// deploy/sql/002_create_sku_attribute_catalog.sql). Contains only the fields
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql). Contains only the fields
 /// required to resolve and validate a SKU attribute assignment
 /// (docs task: "SKU attribute foundation").
 /// </summary>

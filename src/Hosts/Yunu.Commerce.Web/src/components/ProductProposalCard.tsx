@@ -1,4 +1,4 @@
-import type { ProductProposal } from "../models/productProposal";
+﻿import type { ProductProposal } from "../models/productProposal";
 
 interface ProductProposalCardProps {
   proposal: ProductProposal;
@@ -42,7 +42,6 @@ export function ProductProposalCard({ proposal }: ProductProposalCardProps) {
 
       <div className="metadata-row">
         <div><span>Marca</span><strong>{product.brandId || "A definir"}</strong></div>
-        <div><span>Família</span><strong>{product.familyId || "A definir"}</strong></div>
         <div><span>Idioma</span><strong>{proposal.locale === "pt-BR" ? "Português (Brasil)" : proposal.locale}</strong></div>
         <div><span>Criado em</span><strong>{formatDate(proposal.createdAtUtc)}</strong></div>
       </div>

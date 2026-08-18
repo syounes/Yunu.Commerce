@@ -10,7 +10,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
 /// public.sku_attribute_embeddings using cosine distance (1 - (embedding
 /// &lt;=&gt; @query)), matching the convention already established for the
 /// attribute embedding synchronization pipeline
-/// (deploy/docker/postgres/init/003_create_sku_attribute_vectors.sql).
+/// (deploy/databases/postgres/003_create_sku_attribute_vectors.sql).
 ///
 /// Only rows with is_active = true, embedding IS NOT NULL and
 /// embedded_content_hash = content_hash are considered, so pending/stale

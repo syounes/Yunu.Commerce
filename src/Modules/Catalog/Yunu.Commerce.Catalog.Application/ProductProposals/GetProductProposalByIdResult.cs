@@ -32,7 +32,6 @@ public sealed record ProposedProductDto(
     string? SuggestedName,
     string? Description,
     Guid? BrandId,
-    Guid? FamilyId,
     ProposedGoogleCategoryDto GoogleCategory);
 
 public sealed record ProposedGoogleCategoryDto(

@@ -1,5 +1,4 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
 using Yunu.Commerce.SharedKernel;
 
@@ -18,10 +17,9 @@ namespace Yunu.Commerce.Catalog.Domain.Products;
 /// Classification modeling decision: Product no longer owns an internal
 /// CategoryId directly. GoogleCategory (an external, required classification
 /// resolved by Application from the canonical Google Product Taxonomy) is now
-/// the mandatory classification at Product creation time. BrandId and FamilyId
-/// (the internal Yunu Department → Category → SubCategory → Family hierarchy
-/// reference) remain optional, because internal Yunu classification/mapping may
-/// be assigned after creation, once Brand/Family enrichment is implemented.
+/// the mandatory classification at Product creation time. BrandId remains
+/// optional, because internal Yunu classification/mapping may be assigned
+/// after creation, once Brand enrichment is implemented.
 ///
 /// Lifecycle transition behavior (Activate/Deactivate/Archive/SubmitForReview) is
 /// intentionally deferred until a documented use case defines the transition rules
@@ -44,8 +42,6 @@ public sealed class Product
 
     public BrandId? BrandId { get; }
 
-    public FamilyId? FamilyId { get; }
-
     public GoogleCategoryReference GoogleCategory { get; }
 
     public ProductStatus Status { get; private set; }
@@ -57,7 +53,6 @@ public sealed class Product
         ProductName name,
         string? description,
         BrandId? brandId,
-        FamilyId? familyId,
         GoogleCategoryReference googleCategory,
         ProductStatus status)
     {
@@ -67,7 +62,6 @@ public sealed class Product
         Name = name;
         Description = description;
         BrandId = brandId;
-        FamilyId = familyId;
         GoogleCategory = googleCategory;
         Status = status;
     }
@@ -77,11 +71,10 @@ public sealed class Product
         ProductName name,
         string? description,
         BrandId? brandId,
-        FamilyId? familyId,
         GoogleCategoryReference googleCategory,
         ProductStatus status = ProductStatus.Draft)
     {
-        var product = new Product(id, name, description, brandId, familyId, googleCategory, status);
+        var product = new Product(id, name, description, brandId, googleCategory, status);
 
         product._domainEvents.Add(new ProductCreatedDomainEvent(id));
 

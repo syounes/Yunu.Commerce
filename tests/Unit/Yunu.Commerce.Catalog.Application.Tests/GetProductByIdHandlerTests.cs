@@ -1,6 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Application.Products.GetProductById;
 using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
 using Xunit;
@@ -25,7 +24,6 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             "Tênis esportivo masculino para corrida e uso diário.",
             BrandId.New(),
-            FamilyId.New(),
             CreateGoogleCategory());
 
         await productRepository.AddAsync(product, CancellationToken.None);
@@ -43,7 +41,6 @@ public class GetProductByIdHandlerTests
         Assert.Equal("Apple iPhone 17 Pro", response.Name);
         Assert.Equal("Tênis esportivo masculino para corrida e uso diário.", response.Description);
         Assert.Equal(product.BrandId!.Value.Value, response.BrandId);
-        Assert.Equal(product.FamilyId!.Value.Value, response.FamilyId);
         Assert.Equal(product.GoogleCategory.Id, response.GoogleCategory.Id);
         Assert.Equal(product.GoogleCategory.Path, response.GoogleCategory.Path);
         Assert.Equal(ProductStatus.Draft.ToString(), response.Status);
@@ -64,7 +61,6 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             BrandId.New(),
-            FamilyId.New(),
             CreateGoogleCategory());
 
         await productRepository.AddAsync(product, CancellationToken.None);
@@ -79,7 +75,7 @@ public class GetProductByIdHandlerTests
     }
 
     [Fact]
-    public async Task Handle_With_Product_Without_BrandId_And_FamilyId_Should_Return_Null()
+    public async Task Handle_With_Product_Without_BrandId_Should_Return_Null()
     {
         var productRepository = new FakeProductRepository();
         var skuRepository = new FakeSkuRepository();
@@ -89,7 +85,6 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             brandId: null,
-            familyId: null,
             CreateGoogleCategory());
 
         await productRepository.AddAsync(product, CancellationToken.None);
@@ -101,7 +96,6 @@ public class GetProductByIdHandlerTests
 
         Assert.NotNull(response);
         Assert.Null(response!.BrandId);
-        Assert.Null(response.FamilyId);
     }
 
     [Fact]

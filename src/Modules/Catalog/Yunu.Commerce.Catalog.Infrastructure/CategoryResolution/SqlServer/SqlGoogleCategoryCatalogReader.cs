@@ -11,7 +11,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.SqlServer;
 /// queries resolve many candidates in a single round-trip, mirroring <see
 /// cref="Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer.SqlAttributeCatalogReader"/>.
 /// Uses plain ADO.NET (Microsoft.Data.SqlClient) against [Catalog].[GoogleTaxonomyCategories]
-/// (deploy/sql/001-google-taxonomy-tables.sql), reusing the same Catalog SQL
+/// (deploy/databases/sqlserver/001-google-taxonomy-tables.sql), reusing the same Catalog SQL
 /// Server connection (<see cref="GoogleTaxonomySqlOptions"/>,
 /// "Catalog:GoogleTaxonomySql").
 ///

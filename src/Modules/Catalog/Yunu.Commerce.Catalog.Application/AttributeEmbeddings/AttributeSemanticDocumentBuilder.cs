@@ -75,7 +75,7 @@ public static class AttributeSemanticDocumentBuilder
     /// <summary>
     /// SHA-256 hash (lowercase hexadecimal) of the exact UTF-8 semantic text
     /// sent to the embedding provider, matching the convention already
-    /// established by deploy/docker/postgres/init/003_create_sku_attribute_vectors.sql
+    /// established by deploy/databases/postgres/003_create_sku_attribute_vectors.sql
     /// (encode(digest(...,'sha256'),'hex')).
     /// </summary>
     public static string ComputeContentHash(string semanticText)

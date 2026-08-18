@@ -65,9 +65,6 @@ public sealed class ProposedProductMongoModel
     [BsonRepresentation(BsonType.String)]
     public Guid? BrandId { get; set; }
 
-    [BsonRepresentation(BsonType.String)]
-    public Guid? FamilyId { get; set; }
-
     public ProposedGoogleCategoryMongoModel GoogleCategory { get; set; } = null!;
 }
 

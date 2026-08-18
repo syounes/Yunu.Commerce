@@ -4,7 +4,7 @@
 /// Read model for an active, searchable Catalog Attribute Definition used as
 /// the source for semantic embedding generation (docs task: "SKU attribute
 /// embedding synchronization pipeline"). Decoupled from the SQL Server row
-/// shape (Catalog.AttributeDefinitions, deploy/sql/002_create_sku_attribute_catalog.sql).
+/// shape (Catalog.AttributeDefinitions, deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql).
 /// </summary>
 public sealed class AttributeDefinitionSource
 {

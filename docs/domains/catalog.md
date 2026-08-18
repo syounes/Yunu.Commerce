@@ -306,8 +306,7 @@ Product does **not** reference `CategoryId`, `SubCategoryId` or `DepartmentId`
 directly. The implemented Product Aggregate exposes:
 
 ````````markdown
-Product only stores `FamilyId` as its internal hierarchy reference; the rest of
-the hierarchy is resolved through Family, not through Product directly.
+Product does not store any internal Family hierarchy reference.
 
 `GoogleCategory` is a denormalized reference (`GoogleCategoryReference.Id` +
 `GoogleCategoryReference.Path`) resolved by Catalog.Application from the
@@ -358,7 +357,7 @@ not own, construct or persist Sku attributes.
 Attribute reference data — definitions, options and Google category attribute
 rules — is owned by SQL Server (`Catalog.AttributeDefinitions`,
 `Catalog.AttributeOptions`, `Catalog.GoogleCategoryAttributeRules`,
-deploy/sql/002_create_sku_attribute_catalog.sql). Catalog.Domain never queries
+deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql). Catalog.Domain never queries
 SQL Server directly: Catalog.Application resolves and validates attribute
 definitions/options via `IAttributeCatalogRepository` before asking the Sku
 Aggregate (`Sku.AssignAttribute` / `ReplaceAttribute` / `RemoveAttribute`) to

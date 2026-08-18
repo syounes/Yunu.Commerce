@@ -11,7 +11,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.Postgre
 /// string/JSON/byte[] encoding (docs task: "GenerateGoogleTaxonomyEmbedding").
 ///
 /// Persists to google_taxonomy_embeddings
-/// (deploy/docker/postgres/init/002-create-google-taxonomy-embeddings.sql) using
+/// (deploy/databases/postgres/002-create-google-taxonomy-embeddings.sql) using
 /// an atomic INSERT ... ON CONFLICT DO UPDATE upsert keyed by
 /// (google_category_id, provider, model).
 /// </summary>

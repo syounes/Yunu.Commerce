@@ -1,5 +1,4 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
-using Yunu.Commerce.Catalog.Domain.Families;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
 using Xunit;
@@ -17,7 +16,6 @@ public class ProductTests
         string name = "Apple iPhone 17 Pro",
         string? description = null,
         BrandId? brandId = null,
-        FamilyId? familyId = null,
         GoogleCategoryReference? googleCategory = null)
     {
         return Product.Create(
@@ -25,7 +23,6 @@ public class ProductTests
             new ProductName(name),
             description,
             brandId,
-            familyId,
             googleCategory ?? CreateGoogleCategory());
     }
 
@@ -71,7 +68,6 @@ public class ProductTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             brandId: null,
-            familyId: null,
             googleCategory: null!));
     }
 
@@ -81,26 +77,6 @@ public class ProductTests
         var product = CreateProduct(brandId: null);
 
         Assert.Null(product.BrandId);
-    }
-
-    [Fact]
-    public void Create_Should_Accept_Null_FamilyId()
-    {
-        var product = CreateProduct(familyId: null);
-
-        Assert.Null(product.FamilyId);
-    }
-
-    [Fact]
-    public void Create_Should_Accept_Both_BrandId_And_FamilyId()
-    {
-        var brandId = BrandId.New();
-        var familyId = FamilyId.New();
-
-        var product = CreateProduct(brandId: brandId, familyId: familyId);
-
-        Assert.Equal(brandId, product.BrandId);
-        Assert.Equal(familyId, product.FamilyId);
     }
 
     [Fact]

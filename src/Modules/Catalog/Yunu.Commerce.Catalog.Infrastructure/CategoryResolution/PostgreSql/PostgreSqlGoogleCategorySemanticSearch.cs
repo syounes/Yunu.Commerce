@@ -14,7 +14,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.PostgreSql;
 ///
 /// Unlike public.sku_attribute_embeddings, the current
 /// google_taxonomy_embeddings schema
-/// (deploy/docker/postgres/init/002-create-google-taxonomy-embeddings.sql)
+/// (deploy/databases/postgres/002-create-google-taxonomy-embeddings.sql)
 /// does not have is_active, content_hash or embedded_content_hash columns:
 /// every persisted row is a fresh upsert (see
 /// PostgreSqlGoogleTaxonomyEmbeddingRepository.UpsertAsync), so those filters

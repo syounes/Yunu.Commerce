@@ -8,7 +8,7 @@ namespace Yunu.Commerce.Catalog.Domain.Attributes;
 /// with private, type-specific static factories rather than either an
 /// unvalidated dictionary or ten separate leaf types: the SQL Server
 /// reference schema (Catalog.SkuAttributeValues,
-/// deploy/sql/002_create_sku_attribute_catalog.sql) already stores one row
+/// deploy/databases/sqlserver/002_create_sku_attribute_catalog.sql) already stores one row
 /// per assignment with per-type nullable columns, so mirroring that shape
 /// here — while enforcing "only the matching typed field is populated" through
 /// the factories — is the least complex option consistent with the existing

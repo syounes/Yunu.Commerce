@@ -166,7 +166,6 @@ public static class ProductProposalEndpoints
                 SuggestedName = result.Product.SuggestedName,
                 Description = result.Product.Description,
                 BrandId = result.Product.BrandId,
-                FamilyId = result.Product.FamilyId,
                 GoogleCategory = new ProposedGoogleCategoryResponse
                 {
                     GoogleCategoryId = result.Product.GoogleCategory.GoogleCategoryId,

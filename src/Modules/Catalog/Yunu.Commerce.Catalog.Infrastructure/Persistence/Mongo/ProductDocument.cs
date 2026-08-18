@@ -15,8 +15,8 @@ namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 /// Classification modeling decision: CategoryId is no longer part of the
 /// current Product model. [BsonIgnoreExtraElements] preserves compatibility
 /// with pre-existing local development documents that still contain a legacy
-/// "categoryId" field; that field is silently ignored on read and never
-/// written by new code. BrandId/FamilyId are nullable to reflect the optional
+/// "categoryId" field; that field is silently ignored on read
+/// and never written by new code. BrandId is nullable to reflect the optional
 /// internal classification. GoogleCategory is required for all newly created
 /// Products.
 /// </summary>
@@ -33,9 +33,6 @@ public sealed class ProductDocument
 
     [BsonRepresentation(BsonType.String)]
     public Guid? BrandId { get; set; }
-
-    [BsonRepresentation(BsonType.String)]
-    public Guid? FamilyId { get; set; }
 
     public GoogleCategoryDocument GoogleCategory { get; set; } = null!;
 

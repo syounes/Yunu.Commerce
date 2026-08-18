@@ -13,7 +13,7 @@ namespace Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
 /// <see cref="Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql.PostgreSqlGoogleTaxonomyEmbeddingRepository"/>.
 ///
 /// Persists to public.sku_attribute_embeddings
-/// (deploy/docker/postgres/init/003_create_sku_attribute_vectors.sql) using an
+/// (deploy/databases/postgres/003_create_sku_attribute_vectors.sql) using an
 /// atomic INSERT ... ON CONFLICT DO UPDATE upsert keyed by
 /// (entity_type, entity_id, locale). The PostgreSQL-generated id is preserved
 /// during updates (id is only used in the INSERT branch/RETURNING clause).

@@ -1,4 +1,4 @@
-export interface CreateProductProposalRequest {
+﻿export interface CreateProductProposalRequest {
   input: string;
   locale: string;
 }
@@ -49,7 +49,6 @@ export interface ProposedProduct {
   suggestedName?: string | null;
   description?: string | null;
   brandId?: string | null;
-  familyId?: string | null;
   googleCategory: ProposedGoogleCategory;
 }
 

@@ -73,7 +73,6 @@ public sealed class CreateProductProposalHandler
             SuggestedName: null,
             Description: null,
             BrandId: null,
-            FamilyId: null,
             GoogleCategory: MapGoogleCategory(category));
 
         var attributes = resolution.Attributes?.Attributes ?? Array.Empty<ResolvedAttributeHint>();
