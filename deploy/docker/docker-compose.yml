@@ -57,7 +57,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:-yunu_vectors}"
     volumes:
       - yunu_postgres_data:/var/lib/postgresql/data
-      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ../databases/postgres:/docker-entrypoint-initdb.d:ro
     networks:
       - yunu-network
     healthcheck:
