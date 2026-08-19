@@ -44,7 +44,7 @@ public sealed class CanonicalTaxonomyNode
 
     public int Depth { get; }
 
-    public string Path { get; }
+    public string Path { get; private set; }
 
     public CanonicalTaxonomySource Source { get; }
 
@@ -169,12 +169,14 @@ public sealed class CanonicalTaxonomyNode
     }
 
     /// <summary>
-    /// Renames a leaf node (Name/NormalizedName/Description). Leaf-ness and
-    /// usage-by-Product checks are enforced by Catalog.Application before
+    /// Renames a leaf node (Name/NormalizedName/Description/Path). Leaf-ness
+    /// and usage-by-Product checks are enforced by Catalog.Application before
     /// calling this method (docs task §22); the Aggregate itself has no
-    /// visibility into children or Products.
+    /// visibility into children or Products. Path is computed by the
+    /// Application layer from the parent's current Path (or from the new
+    /// name alone for a root node) and is only validated/persisted here.
     /// </summary>
-    public void Update(string name, string normalizedName, string? description)
+    public void Update(string name, string normalizedName, string? description, string path)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -186,9 +188,15 @@ public sealed class CanonicalTaxonomyNode
             throw new ArgumentException("NormalizedName cannot be null, empty or whitespace.", nameof(normalizedName));
         }
 
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path cannot be null, empty or whitespace.", nameof(path));
+        }
+
         Name = name.Trim();
         NormalizedName = normalizedName.Trim();
         Description = description;
+        Path = path.Trim();
 
         _domainEvents.Add(new Events.CanonicalTaxonomyNodeUpdatedDomainEvent(Id));
     }

@@ -29,8 +29,20 @@ internal sealed class FakeProductRepository : IProductRepository
 
     public Task<bool> ExistsByCanonicalTaxonomyNodeIdAsync(CanonicalTaxonomyNodeId canonicalTaxonomyNodeId, CancellationToken cancellationToken)
     {
-        var exists = _products.Values.Any(p => p.CanonicalTaxonomyNodeId == canonicalTaxonomyNodeId);
+        var exists = _products.Values.Any(p => p.CanonicalTaxonomyNodeId == canonicalTaxonomyNodeId)
+            || _canonicalTaxonomyNodeIdsInUse.Contains(canonicalTaxonomyNodeId);
         return Task.FromResult(exists);
+    }
+
+    private readonly HashSet<CanonicalTaxonomyNodeId> _canonicalTaxonomyNodeIdsInUse = new();
+
+    /// <summary>
+    /// Test-only helper to simulate a Canonical Taxonomy node being referenced
+    /// by a Product, without requiring a fully constructed Product aggregate.
+    /// </summary>
+    public void MarkCanonicalTaxonomyNodeInUse(CanonicalTaxonomyNodeId canonicalTaxonomyNodeId)
+    {
+        _canonicalTaxonomyNodeIdsInUse.Add(canonicalTaxonomyNodeId);
     }
 
     public Task<bool> ExistsByBrandIdAsync(BrandId brandId, CancellationToken cancellationToken)

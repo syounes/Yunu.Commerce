@@ -193,7 +193,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var id = await _repository.AddAsync(node, CancellationToken.None);
 
         var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
-        persisted!.Update("Updated Name", "updated name", "Updated description");
+        persisted!.Update("Updated Name", "updated name", "Updated description", "Updated Name");
 
         await _repository.UpdateAsync(persisted, CancellationToken.None);
 
@@ -202,6 +202,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         Assert.Equal("Updated Name", reloaded!.Name);
         Assert.Equal("updated name", reloaded.NormalizedName);
         Assert.Equal("Updated description", reloaded.Description);
+        Assert.Equal("Updated Name", reloaded.Path);
     }
 
     [Fact]

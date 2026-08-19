@@ -58,6 +58,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
             SET Name = @Name,
                 NormalizedName = @NormalizedName,
                 Description = @Description,
+                Path = @Path,
                 UpdatedAt = @UpdatedAt
             WHERE CanonicalTaxonomyNodeId = @CanonicalTaxonomyNodeId
             """;
@@ -69,6 +70,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         command.Parameters.AddWithValue("@Name", node.Name);
         command.Parameters.AddWithValue("@NormalizedName", node.NormalizedName);
         command.Parameters.AddWithValue("@Description", (object?)node.Description ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Path", node.Path);
         command.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
         command.Parameters.AddWithValue("@CanonicalTaxonomyNodeId", node.Id.Value);
 

@@ -46,9 +46,31 @@ public sealed class UpdateCanonicalTaxonomyNodeHandler
         }
 
         var normalizedName = Brand.ComputeNormalizedName(command.Name);
+        var newPath = await ComputeNewPathAsync(node, command.Name, cancellationToken);
 
-        node.Update(command.Name, normalizedName, command.Description);
+        node.Update(command.Name, normalizedName, command.Description, newPath);
 
         await _canonicalTaxonomyRepository.UpdateAsync(node, cancellationToken);
+    }
+
+    private async Task<string> ComputeNewPathAsync(
+        CanonicalTaxonomyNode node,
+        string newName,
+        CancellationToken cancellationToken)
+    {
+        if (node.ParentId is null)
+        {
+            return newName.Trim();
+        }
+
+        var parent = await _canonicalTaxonomyRepository.GetByIdAsync(node.ParentId.Value, cancellationToken);
+
+        if (parent is null)
+        {
+            throw new InvalidOperationException(
+                $"Canonical Taxonomy node '{node.Id.Value}' references a parent '{node.ParentId.Value.Value}' that does not exist.");
+        }
+
+        return $"{parent.Path.Trim()} > {newName.Trim()}";
     }
 }
