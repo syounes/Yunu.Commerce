@@ -347,4 +347,22 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         Assert.Equal(999001, persisted!.GoogleCategoryId);
         Assert.Equal(CanonicalTaxonomySource.Google, persisted.Source);
     }
+
+    [Fact]
+    public async Task GetRootsAsync_Should_Return_Root_Node_And_Not_Its_Children()
+    {
+        var root = CreateRootNode("get-roots-parent");
+        var rootId = await _repository.AddAsync(root, CancellationToken.None);
+
+        var child = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), rootId, "get-roots-child", "Child", "child", null, 1, "Name get-roots-parent > Child",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var childId = await _repository.AddAsync(child, CancellationToken.None);
+
+        var roots = await _repository.GetRootsAsync(CancellationToken.None);
+
+        Assert.Contains(roots, r => r.Id == rootId);
+        Assert.DoesNotContain(roots, r => r.Id == childId);
+        Assert.All(roots, r => Assert.Null(r.ParentId));
+    }
 }

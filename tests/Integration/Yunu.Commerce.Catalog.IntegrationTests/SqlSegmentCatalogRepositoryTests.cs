@@ -150,4 +150,44 @@ public sealed class SqlSegmentCatalogRepositoryTests : IAsyncLifetime
         var displayOrders = options.Select(o => o.DisplayOrder).ToArray();
         Assert.Equal(displayOrders.OrderBy(o => o), displayOrders);
     }
+
+    [Fact]
+    public async Task GetOptionByIdAsync_Should_Return_Option_When_It_Belongs_To_The_Given_Definition()
+    {
+        var definition = await _repository.GetDefinitionByCodeAsync("gender", CancellationToken.None);
+        var options = await _repository.GetOptionsByDefinitionAsync(definition!.SegmentDefinitionId, CancellationToken.None);
+        var expectedOption = options.First();
+
+        var result = await _repository.GetOptionByIdAsync(
+            definition.SegmentDefinitionId, expectedOption.SegmentOptionId, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(expectedOption.SegmentOptionId, result!.SegmentOptionId);
+        Assert.Equal(expectedOption.Code, result.Code);
+    }
+
+    [Fact]
+    public async Task GetOptionByIdAsync_Should_Return_Null_When_Option_Belongs_To_Another_Definition()
+    {
+        var genderDefinition = await _repository.GetDefinitionByCodeAsync("gender", CancellationToken.None);
+        var targetAudienceDefinition = await _repository.GetDefinitionByCodeAsync("target_audience", CancellationToken.None);
+
+        var targetAudienceOptions = await _repository.GetOptionsByDefinitionAsync(targetAudienceDefinition!.SegmentDefinitionId, CancellationToken.None);
+        var optionFromOtherDefinition = targetAudienceOptions.First();
+
+        var result = await _repository.GetOptionByIdAsync(
+            genderDefinition!.SegmentDefinitionId, optionFromOtherDefinition.SegmentOptionId, CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetOptionByIdAsync_Should_Return_Null_When_Option_Id_Does_Not_Exist()
+    {
+        var definition = await _repository.GetDefinitionByCodeAsync("gender", CancellationToken.None);
+
+        var result = await _repository.GetOptionByIdAsync(definition!.SegmentDefinitionId, 999_999, CancellationToken.None);
+
+        Assert.Null(result);
+    }
 }

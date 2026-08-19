@@ -140,6 +140,31 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         return results;
     }
 
+    public async Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetRootsAsync(CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status
+            FROM Catalog.CanonicalTaxonomyNodes
+            WHERE ParentId IS NULL
+            ORDER BY Path, CanonicalTaxonomyNodeId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        var results = new List<CanonicalTaxonomyNode>();
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(ReadNode(reader));
+        }
+
+        return results;
+    }
+
     public async Task<bool> HasChildrenAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)
     {
         const string sql = """

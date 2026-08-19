@@ -23,8 +23,15 @@ using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTaxonom
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.DeleteCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyChildren;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyNodeById;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyRoots;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.UpdateCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentDefinitionByCode;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentDefinitionById;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentDefinitions;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentOptionByCode;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentOptionById;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentOptionsByDefinition;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 
 namespace Yunu.Commerce.Catalog.Application;
@@ -55,8 +62,16 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateCanonicalTaxonomyNodeHandler>();
         services.AddScoped<GetCanonicalTaxonomyNodeByIdHandler>();
         services.AddScoped<GetCanonicalTaxonomyChildrenHandler>();
+        services.AddScoped<GetCanonicalTaxonomyRootsHandler>();
         services.AddScoped<UpdateCanonicalTaxonomyNodeHandler>();
         services.AddScoped<DeleteCanonicalTaxonomyNodeHandler>();
+
+        services.AddScoped<GetSegmentDefinitionsHandler>();
+        services.AddScoped<GetSegmentDefinitionByIdHandler>();
+        services.AddScoped<GetSegmentDefinitionByCodeHandler>();
+        services.AddScoped<GetSegmentOptionsByDefinitionHandler>();
+        services.AddScoped<GetSegmentOptionByIdHandler>();
+        services.AddScoped<GetSegmentOptionByCodeHandler>();
 
         services.AddScoped<CreateProductProposalHandler>();
         services.AddScoped<GetProductProposalByIdHandler>();

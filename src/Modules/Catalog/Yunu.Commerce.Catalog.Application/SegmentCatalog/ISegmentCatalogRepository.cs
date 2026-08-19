@@ -34,4 +34,15 @@ public interface ISegmentCatalogRepository
     Task<IReadOnlyCollection<SegmentOptionResponse>> GetOptionsByDefinitionAsync(
         long segmentDefinitionId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns a Segment Option by identity, scoped to its parent Segment
+    /// Definition (docs task: "CQRS de leitura e endpoints GET para Segments
+    /// e Canonical Taxonomy" §1). Returns null when the option does not
+    /// exist or belongs to a different Definition.
+    /// </summary>
+    Task<SegmentOptionResponse?> GetOptionByIdAsync(
+        long segmentDefinitionId,
+        long segmentOptionId,
+        CancellationToken cancellationToken);
 }

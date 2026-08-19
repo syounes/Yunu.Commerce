@@ -28,7 +28,14 @@ public interface ICanonicalTaxonomyRepository
     Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetChildrenAsync(CanonicalTaxonomyNodeId parentId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Whether the given node currently has any children. Used by
+    /// Returns the root nodes of the tree (ParentId = null), ordered by Path
+    /// (docs task: "CQRS de leitura e endpoints GET para Segments e
+    /// Canonical Taxonomy" §3).
+    /// </summary>
+    Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetRootsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the given node currently has any children.
     /// Catalog.Application to derive leaf-ness before allowing Update/Delete
     /// (docs task §22).
     /// </summary>

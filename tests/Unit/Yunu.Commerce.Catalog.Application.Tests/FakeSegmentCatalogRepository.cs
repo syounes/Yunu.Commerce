@@ -40,6 +40,12 @@ internal sealed class FakeSegmentCatalogRepository : ISegmentCatalogRepository
         return Task.FromResult<IReadOnlyCollection<SegmentOptionResponse>>(options);
     }
 
+    public Task<SegmentOptionResponse?> GetOptionByIdAsync(long segmentDefinitionId, long segmentOptionId, CancellationToken cancellationToken)
+    {
+        var option = _options.Values.FirstOrDefault(o => o.SegmentDefinitionId == segmentDefinitionId && o.SegmentOptionId == segmentOptionId);
+        return Task.FromResult(option);
+    }
+
     public void AddDefinition(SegmentDefinitionResponse definition)
     {
         _definitionsById[definition.SegmentDefinitionId] = definition;

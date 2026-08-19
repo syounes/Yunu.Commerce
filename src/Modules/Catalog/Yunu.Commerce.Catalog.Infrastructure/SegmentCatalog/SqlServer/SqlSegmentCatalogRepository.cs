@@ -110,6 +110,28 @@ public sealed class SqlSegmentCatalogRepository : ISegmentCatalogRepository
         return ReadOption(reader);
     }
 
+    public async Task<SegmentOptionResponse?> GetOptionByIdAsync(long segmentDefinitionId, long segmentOptionId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT SegmentOptionId, SegmentDefinitionId, Code, Name, Description, DisplayOrder, Status
+            FROM Catalog.SegmentOptions
+            WHERE SegmentDefinitionId = @SegmentDefinitionId
+              AND SegmentOptionId = @SegmentOptionId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@SegmentDefinitionId", segmentDefinitionId);
+        command.Parameters.AddWithValue("@SegmentOptionId", segmentOptionId);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return null;
+
+        return ReadOption(reader);
+    }
+
     public async Task<IReadOnlyCollection<SegmentOptionResponse>> GetOptionsByDefinitionAsync(long segmentDefinitionId, CancellationToken cancellationToken)
     {
         const string sql = """

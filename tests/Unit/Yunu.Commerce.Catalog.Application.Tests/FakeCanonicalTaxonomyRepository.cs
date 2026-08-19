@@ -57,6 +57,12 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
         return Task.FromResult(hasChildren);
     }
 
+    public Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetRootsAsync(CancellationToken cancellationToken)
+    {
+        var roots = _nodes.Values.Where(n => n.ParentId is null).OrderBy(n => n.Path).ToList();
+        return Task.FromResult<IReadOnlyCollection<CanonicalTaxonomyNode>>(roots);
+    }
+
     public void Add(long id, CanonicalTaxonomyNode node)
     {
         _nodes[id] = node;
