@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
+using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
@@ -26,6 +28,23 @@ public sealed class MongoProductRepository : IProductRepository
         var document = ProductDocumentMapper.ToDocument(product);
 
         await _collection.InsertOneAsync(document, options: null, cancellationToken);
+    }
+
+    public async Task<bool> ExistsByBrandIdAsync(BrandId brandId, CancellationToken cancellationToken)
+    {
+        return await _collection
+            .Find(document => document.BrandId == brandId.Value)
+            .Limit(1)
+            .AnyAsync(cancellationToken);
+    }
+
+    public async Task<bool> ExistsByCanonicalTaxonomyNodeIdAsync(CanonicalTaxonomyNodeId canonicalTaxonomyNodeId, CancellationToken cancellationToken)
+    {
+        return await _collection
+            .Find(document =>
+                document.CanonicalTaxonomyNodeId == canonicalTaxonomyNodeId.Value)
+            .Limit(1)
+            .AnyAsync(cancellationToken);
     }
 
     public async Task<Product?> GetByIdAsync(ProductId id, CancellationToken cancellationToken)

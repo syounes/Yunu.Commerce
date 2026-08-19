@@ -1,5 +1,4 @@
 ﻿using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
-using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.DeleteCanonicalTaxonomyNode;

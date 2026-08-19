@@ -1,4 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
@@ -21,11 +22,17 @@ internal static class ProductDocumentMapper
             Name = product.Name.Value,
             Description = product.Description,
             BrandId = product.BrandId?.Value,
-            GoogleCategory = new GoogleCategoryDocument
+            CanonicalTaxonomyNodeId = product.CanonicalTaxonomyNodeId.Value,
+            SegmentAssignments = product.SegmentAssignments.Select(sa => new SegmentAssignmentDocument
             {
-                Id = product.GoogleCategory.Id,
-                Path = product.GoogleCategory.Path
-            },
+                SegmentDefinitionId = sa.SegmentDefinitionId.Value,
+                SegmentCode = sa.SegmentCode,
+                Options = sa.Options.Select(o => new SegmentOptionSelectionDocument
+                {
+                    SegmentOptionId = o.SegmentOptionId.Value,
+                    OptionCode = o.OptionCode
+                }).ToList()
+            }).ToList(),
             Status = product.Status.ToString()
         };
     }
@@ -37,11 +44,12 @@ internal static class ProductDocumentMapper
             new ProductName(document.Name),
             document.Description,
             document.BrandId is { } brandId ? new BrandId(brandId) : (BrandId?)null,
-            new GoogleCategoryReference(document.GoogleCategory.Id, document.GoogleCategory.Path),
+            new CanonicalTaxonomyNodeId(document.CanonicalTaxonomyNodeId),
             Enum.Parse<ProductStatus>(document.Status));
 
         product.ClearDomainEvents();
 
         return product;
     }
+
 }

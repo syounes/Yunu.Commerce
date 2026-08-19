@@ -1,5 +1,4 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Segments;
-using Yunu.Commerce.Catalog.Domain.Segments;
 using Yunu.Commerce.SharedKernel;
 
 namespace Yunu.Commerce.Catalog.Domain.Skus.Events;
