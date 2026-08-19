@@ -1,4 +1,6 @@
-﻿using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
+﻿using Yunu.Commerce.Catalog.Application.Brands;
+using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
+using Yunu.Commerce.Catalog.Application.Brands.DeleteBrand;
 using Yunu.Commerce.Catalog.Application.Brands.GetBrand;
 using Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
 using Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
@@ -29,6 +31,12 @@ public static class CatalogBrandEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        app.MapDelete("/api/catalog/brands/{brandId}", DeleteBrandAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         return app;
     }
@@ -144,6 +152,34 @@ public static class CatalogBrandEndpoints
         catch (ArgumentException ex)
         {
             return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+    }
+
+    private static async Task<IResult> DeleteBrandAsync(
+        string brandId,
+        DeleteBrandHandler handler,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(brandId, out var parsed))
+        {
+            return Results.Problem(detail: $"'{brandId}' is not a valid Brand identifier.", statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        try
+        {
+            var command = new DeleteBrandCommand { BrandId = parsed };
+
+            await handler.HandleAsync(command, cancellationToken);
+
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (BrandInUseException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
         }
     }
 }
