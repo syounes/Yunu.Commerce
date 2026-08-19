@@ -10,7 +10,9 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.ProductProposals;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
@@ -19,6 +21,7 @@ using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.Synchronization.InMemory;
 using Yunu.Commerce.Catalog.Infrastructure.Brands.SqlServer;
+using Yunu.Commerce.Catalog.Infrastructure.CanonicalTaxonomy.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.CategoryResolution.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Embeddings.PostgreSql;
@@ -26,6 +29,7 @@ using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Sources.Http;
 using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Synchronization.InMemory;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
+using Yunu.Commerce.Catalog.Infrastructure.SegmentCatalog.SqlServer;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;
 
@@ -89,6 +93,9 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<IGoogleCategoryCatalogReader, SqlGoogleCategoryCatalogReader>();
         services.AddSingleton<IGoogleCategorySemanticSearch, PostgreSqlGoogleCategorySemanticSearch>();
         services.AddSingleton<IBrandRepository, SqlBrandRepository>();
+
+        services.AddSingleton<ICanonicalTaxonomyRepository, SqlCanonicalTaxonomyRepository>();
+        services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
 
         return services;
     }

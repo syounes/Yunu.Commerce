@@ -18,6 +18,7 @@ using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
 using Yunu.Commerce.Catalog.Application.Brands.GetBrand;
 using Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
 using Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 
 namespace Yunu.Commerce.Catalog.Application;
 
@@ -35,6 +36,8 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateSkuHandler>();
         services.AddScoped<GetSkuByIdHandler>();
         services.AddScoped<GetSkusByProductIdHandler>();
+
+        services.AddScoped<SegmentAssignmentResolver>();
 
         services.AddScoped<CreateBrandHandler>();
         services.AddScoped<GetBrandHandler>();
