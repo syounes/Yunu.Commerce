@@ -25,6 +25,7 @@ using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyCh
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyNodeById;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.UpdateCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
+using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 
 namespace Yunu.Commerce.Catalog.Application;
 
@@ -64,6 +65,7 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GenerateGoogleTaxonomyEmbeddingHandler>();
         services.AddScoped<SynchronizeGoogleTaxonomyEmbeddingsHandler>();
         services.AddScoped<SynchronizeAttributeEmbeddingsHandler>();
+        services.AddScoped<SynchronizeSegmentEmbeddingsHandler>();
 
         services.AddOptions<AttributeResolutionOptions>()
             .Bind(configuration.GetSection("AI:AttributeResolution"))
