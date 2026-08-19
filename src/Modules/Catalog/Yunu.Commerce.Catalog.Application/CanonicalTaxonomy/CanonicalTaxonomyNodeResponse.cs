@@ -10,7 +10,7 @@ public sealed class CanonicalTaxonomyNodeResponse
 
     public long? ParentId { get; init; }
 
-    public long? SegmentDefinitionId { get; init; }
+    public long? GoogleCategoryId { get; init; }
 
     public required string Code { get; init; }
 

@@ -1,8 +1,6 @@
 ﻿
-using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
-using Yunu.Commerce.Catalog.Domain.Segments;
 
 namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTaxonomyNode;
 
@@ -10,21 +8,19 @@ namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTax
 /// Orchestrates creation of a new Canonical Taxonomy node, root or child
 /// (docs task: "Canonical Taxonomy + Segments Domain" §19, §21). When a
 /// ParentId is supplied, the parent is loaded from SQL Server and Depth/Path
-/// are computed from it (docs task §6); the API never supplies Depth/Path
-/// as authority. When a SegmentCode is supplied, it is resolved against
-/// Catalog.SegmentDefinitions and must be Active.
+/// are computed from it (docs task §6): Path concatenates pt-BR node Names
+/// with " > ", never Code and never "/". The API never supplies Depth/Path
+/// as authority. Association between a node and Segment Definitions is
+/// handled separately through Catalog.CanonicalTaxonomyNodeSegmentDefinitions
+/// and is out of scope for this handler.
 /// </summary>
 public sealed class CreateCanonicalTaxonomyNodeHandler
 {
     private readonly ICanonicalTaxonomyRepository _canonicalTaxonomyRepository;
-    private readonly ISegmentCatalogRepository _segmentCatalogRepository;
 
-    public CreateCanonicalTaxonomyNodeHandler(
-        ICanonicalTaxonomyRepository canonicalTaxonomyRepository,
-        ISegmentCatalogRepository segmentCatalogRepository)
+    public CreateCanonicalTaxonomyNodeHandler(ICanonicalTaxonomyRepository canonicalTaxonomyRepository)
     {
         _canonicalTaxonomyRepository = canonicalTaxonomyRepository;
-        _segmentCatalogRepository = segmentCatalogRepository;
     }
 
     public async Task<CreateCanonicalTaxonomyNodeResult> HandleAsync(
@@ -43,25 +39,6 @@ public sealed class CreateCanonicalTaxonomyNodeHandler
 
         var normalizedName = Brand.ComputeNormalizedName(command.Name);
 
-        SegmentDefinitionId? segmentDefinitionId = null;
-
-        if (!string.IsNullOrWhiteSpace(command.SegmentCode))
-        {
-            var definition = await _segmentCatalogRepository.GetDefinitionByCodeAsync(command.SegmentCode, cancellationToken);
-
-            if (definition is null)
-            {
-                throw new ArgumentException($"Segment '{command.SegmentCode}' does not exist.", nameof(command));
-            }
-
-            if (!string.Equals(definition.Status, "Active", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new ArgumentException($"Segment '{command.SegmentCode}' is not active.", nameof(command));
-            }
-
-            segmentDefinitionId = new SegmentDefinitionId(definition.SegmentDefinitionId);
-        }
-
         var pendingId = new CanonicalTaxonomyNodeId(0);
 
         Domain.CanonicalTaxonomy.CanonicalTaxonomyNode node;
@@ -77,19 +54,19 @@ public sealed class CreateCanonicalTaxonomyNodeHandler
             }
 
             var depth = parent.Depth + 1;
-            var path = $"{parent.Path.TrimEnd('/')}/{command.Code.Trim()}";
+            var path = $"{parent.Path.Trim()} > {command.Name.Trim()}";
 
             node = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateChild(
                 pendingId, parentId, command.Code, command.Name, normalizedName, command.Description,
-                depth, path, segmentDefinitionId);
+                depth, path);
         }
         else
         {
-            var path = $"/{command.Code.Trim()}";
+            var path = command.Name.Trim();
 
             node = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateRoot(
                 pendingId, command.Code, command.Name, normalizedName, command.Description,
-                path, segmentDefinitionId);
+                path);
         }
 
         var assignedId = await _canonicalTaxonomyRepository.AddAsync(node, cancellationToken);

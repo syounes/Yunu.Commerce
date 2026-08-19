@@ -16,7 +16,7 @@ internal static class CanonicalTaxonomyNodeResponseMapper
         {
             CanonicalTaxonomyNodeId = node.Id.Value,
             ParentId = node.ParentId?.Value,
-            SegmentDefinitionId = node.SegmentDefinitionId?.Value,
+            GoogleCategoryId = node.GoogleCategoryId,
             Code = node.Code,
             Name = node.Name,
             Description = node.Description,

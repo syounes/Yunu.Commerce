@@ -7,15 +7,22 @@ namespace Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 /// Canonical Taxonomy Node Aggregate Root (docs task: "Canonical Taxonomy +
 /// Segments Domain" §5-§6). Represents a single node of the Yunu canonical
 /// classification tree, backed by SQL Server (Catalog.CanonicalTaxonomyNodes,
-/// deploy/databases/sqlserver/006-create-canonical-taxonomy-segmentation.sql).
+/// deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql).
 ///
 /// Depth and Path are not caller-supplied: Catalog.Application computes them
 /// from the parent node before calling <see cref="CreateChild"/> (or
 /// <see cref="CreateRoot"/> for a root node), so they always stay consistent
-/// with the tree. IsRoot/IsLeaf/IsAssignable/HasSegment/AppliesToDescendants
-/// are intentionally not modeled as persisted state; leaf-ness in particular
-/// is derived by the Application layer from the absence of children, since
-/// this Aggregate does not have visibility into its descendants.
+/// with the tree. Path is built from pt-BR node names separated by " &gt; ",
+/// never from Code and never using "/". IsRoot/IsLeaf/IsAssignable/
+/// AppliesToDescendants are intentionally not modeled as persisted state;
+/// leaf-ness in particular is derived by the Application layer from the
+/// absence of children, since this Aggregate does not have visibility into
+/// its descendants.
+///
+/// This Aggregate no longer owns a single SegmentDefinitionId: the
+/// association between a node and its Segment Definitions is a many-to-many
+/// relationship owned by Catalog.CanonicalTaxonomyNodeSegmentDefinitions and
+/// is not modeled here.
 /// </summary>
 public sealed class CanonicalTaxonomyNode
 {
@@ -25,7 +32,7 @@ public sealed class CanonicalTaxonomyNode
 
     public CanonicalTaxonomyNodeId? ParentId { get; }
 
-    public Segments.SegmentDefinitionId? SegmentDefinitionId { get; private set; }
+    public long? GoogleCategoryId { get; }
 
     public string Code { get; }
 
@@ -48,7 +55,7 @@ public sealed class CanonicalTaxonomyNode
     private CanonicalTaxonomyNode(
         CanonicalTaxonomyNodeId id,
         CanonicalTaxonomyNodeId? parentId,
-        Segments.SegmentDefinitionId? segmentDefinitionId,
+        long? googleCategoryId,
         string code,
         string name,
         string normalizedName,
@@ -60,7 +67,7 @@ public sealed class CanonicalTaxonomyNode
     {
         Id = id;
         ParentId = parentId;
-        SegmentDefinitionId = segmentDefinitionId;
+        GoogleCategoryId = googleCategoryId;
         Code = code;
         Name = name;
         NormalizedName = normalizedName;
@@ -81,14 +88,15 @@ public sealed class CanonicalTaxonomyNode
         string normalizedName,
         string? description,
         string path,
-        Segments.SegmentDefinitionId? segmentDefinitionId = null,
+        long? googleCategoryId = null,
         CanonicalTaxonomySource source = CanonicalTaxonomySource.Yunu,
         CanonicalTaxonomyNodeStatus status = CanonicalTaxonomyNodeStatus.Draft)
     {
         ValidateCommon(code, name, normalizedName, path);
+        ValidateGoogleSource(source, googleCategoryId);
 
         var node = new CanonicalTaxonomyNode(
-            id, null, segmentDefinitionId, code.Trim(), name.Trim(), normalizedName.Trim(),
+            id, null, googleCategoryId, code.Trim(), name.Trim(), normalizedName.Trim(),
             description, 0, path.Trim(), source, status);
 
         node._domainEvents.Add(new Events.CanonicalTaxonomyNodeCreatedDomainEvent(id));
@@ -111,11 +119,12 @@ public sealed class CanonicalTaxonomyNode
         string? description,
         int depth,
         string path,
-        Segments.SegmentDefinitionId? segmentDefinitionId = null,
+        long? googleCategoryId = null,
         CanonicalTaxonomySource source = CanonicalTaxonomySource.Yunu,
         CanonicalTaxonomyNodeStatus status = CanonicalTaxonomyNodeStatus.Draft)
     {
         ValidateCommon(code, name, normalizedName, path);
+        ValidateGoogleSource(source, googleCategoryId);
 
         if (parentId == id)
         {
@@ -128,7 +137,7 @@ public sealed class CanonicalTaxonomyNode
         }
 
         var node = new CanonicalTaxonomyNode(
-            id, parentId, segmentDefinitionId, code.Trim(), name.Trim(), normalizedName.Trim(),
+            id, parentId, googleCategoryId, code.Trim(), name.Trim(), normalizedName.Trim(),
             description, depth, path.Trim(), source, status);
 
         node._domainEvents.Add(new Events.CanonicalTaxonomyNodeCreatedDomainEvent(id));
@@ -144,7 +153,7 @@ public sealed class CanonicalTaxonomyNode
     public static CanonicalTaxonomyNode Hydrate(
         CanonicalTaxonomyNodeId id,
         CanonicalTaxonomyNodeId? parentId,
-        Segments.SegmentDefinitionId? segmentDefinitionId,
+        long? googleCategoryId,
         string code,
         string name,
         string normalizedName,
@@ -155,7 +164,7 @@ public sealed class CanonicalTaxonomyNode
         CanonicalTaxonomyNodeStatus status)
     {
         return new CanonicalTaxonomyNode(
-            id, parentId, segmentDefinitionId, code, name, normalizedName,
+            id, parentId, googleCategoryId, code, name, normalizedName,
             description, depth, path, source, status);
     }
 
@@ -209,6 +218,14 @@ public sealed class CanonicalTaxonomyNode
         if (string.IsNullOrWhiteSpace(path))
         {
             throw new ArgumentException("Path cannot be null, empty or whitespace.", nameof(path));
+        }
+    }
+
+    private static void ValidateGoogleSource(CanonicalTaxonomySource source, long? googleCategoryId)
+    {
+        if (source == CanonicalTaxonomySource.Google && googleCategoryId is null)
+        {
+            throw new ArgumentException("A node with Source = Google must have a GoogleCategoryId.", nameof(googleCategoryId));
         }
     }
 }
