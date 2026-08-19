@@ -1,6 +1,7 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Attributes;
 using Yunu.Commerce.Catalog.Domain.Attributes.Events;
 using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Segments;
 using Yunu.Commerce.Catalog.Domain.Skus.Events;
 using Yunu.Commerce.SharedKernel;
 
@@ -24,6 +25,7 @@ public sealed class Sku
 {
     private readonly List<IDomainEvent> _domainEvents = new();
     private readonly List<SkuAttribute> _attributes = new();
+    private readonly List<SegmentAssignment> _segmentAssignments = new();
 
     public SkuId Id { get; }
 
@@ -36,6 +38,8 @@ public sealed class Sku
     public SkuStatus Status { get; private set; }
 
     public IReadOnlyCollection<SkuAttribute> Attributes => _attributes;
+
+    public IReadOnlyCollection<SegmentAssignment> SegmentAssignments => _segmentAssignments;
 
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents;
 
@@ -78,11 +82,17 @@ public sealed class Sku
         SkuCode code,
         string? gtin,
         SkuStatus status,
-        IEnumerable<SkuAttribute> attributes)
+        IEnumerable<SkuAttribute> attributes,
+        IEnumerable<SegmentAssignment>? segmentAssignments = null)
     {
         var sku = new Sku(id, productId, code, gtin, status);
 
         sku._attributes.AddRange(attributes);
+
+        if (segmentAssignments is not null)
+        {
+            sku._segmentAssignments.AddRange(segmentAssignments);
+        }
 
         return sku;
     }
@@ -251,5 +261,92 @@ public sealed class Sku
     private SkuAttribute? FindAttribute(AttributeDefinitionId attributeDefinitionId, int sequence)
     {
         return _attributes.FirstOrDefault(a => a.AttributeDefinitionId == attributeDefinitionId && a.Sequence == sequence);
+    }
+
+    /// <summary>
+    /// Assigns a Segment to this Sku. SegmentDefinitionId/SegmentOptionId
+    /// identities and reference-data rules (Definition active, AssignmentScope
+    /// permits Sku/ProductWithSkuOverride, Option belongs to Definition,
+    /// SelectionMode, etc.) must already be resolved and validated by
+    /// Catalog.Application against SQL Server before calling this method
+    /// (docs task: "Canonical Taxonomy + Segments Domain" §30); this method
+    /// only enforces invariants belonging to this Aggregate: no duplicated
+    /// SegmentDefinitionId, and idempotent re-assignment of the same effective
+    /// options. Only the explicit override is ever persisted here; effective
+    /// (inherited) segments are resolved by Application, not by this Aggregate.
+    /// </summary>
+    public void AssignSegment(SegmentDefinitionId segmentDefinitionId, string segmentCode, IEnumerable<SegmentOptionSelection> options)
+    {
+        var existing = FindSegmentAssignment(segmentDefinitionId);
+        var materializedOptions = options.ToList();
+
+        if (existing is not null)
+        {
+            if (existing.HasSameEffectiveOptionsAs(materializedOptions))
+            {
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"A Segment assignment already exists for SegmentDefinitionId '{segmentDefinitionId}' with a different value. Use ReplaceSegment to change it explicitly.");
+        }
+
+        var assignment = SegmentAssignment.Create(segmentDefinitionId, segmentCode, materializedOptions);
+
+        _segmentAssignments.Add(assignment);
+
+        _domainEvents.Add(new SkuSegmentAssignedDomainEvent(Id, segmentDefinitionId, assignment.SegmentCode));
+    }
+
+    /// <summary>
+    /// Explicitly replaces the options of an existing Sku Segment assignment.
+    /// Idempotent when the supplied options are effectively the same as the
+    /// current ones (no event is raised in that case).
+    /// </summary>
+    public void ReplaceSegment(SegmentDefinitionId segmentDefinitionId, string segmentCode, IEnumerable<SegmentOptionSelection> options)
+    {
+        var existing = FindSegmentAssignment(segmentDefinitionId);
+        var materializedOptions = options.ToList();
+
+        if (existing is null)
+        {
+            throw new InvalidOperationException(
+                $"No Segment assignment exists for SegmentDefinitionId '{segmentDefinitionId}' to replace.");
+        }
+
+        if (existing.HasSameEffectiveOptionsAs(materializedOptions))
+        {
+            return;
+        }
+
+        var replacement = SegmentAssignment.Create(segmentDefinitionId, segmentCode, materializedOptions);
+
+        _segmentAssignments.Remove(existing);
+        _segmentAssignments.Add(replacement);
+
+        _domainEvents.Add(new SkuSegmentReplacedDomainEvent(Id, segmentDefinitionId, replacement.SegmentCode));
+    }
+
+    /// <summary>
+    /// Removes an existing Sku Segment assignment identified by
+    /// SegmentDefinitionId. No-op when the assignment does not exist.
+    /// </summary>
+    public void RemoveSegment(SegmentDefinitionId segmentDefinitionId)
+    {
+        var existing = FindSegmentAssignment(segmentDefinitionId);
+
+        if (existing is null)
+        {
+            return;
+        }
+
+        _segmentAssignments.Remove(existing);
+
+        _domainEvents.Add(new SkuSegmentRemovedDomainEvent(Id, segmentDefinitionId));
+    }
+
+    private SegmentAssignment? FindSegmentAssignment(SegmentDefinitionId segmentDefinitionId)
+    {
+        return _segmentAssignments.FirstOrDefault(a => a.SegmentDefinitionId == segmentDefinitionId);
     }
 }

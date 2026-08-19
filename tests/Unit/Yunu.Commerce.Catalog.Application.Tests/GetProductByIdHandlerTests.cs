@@ -1,5 +1,6 @@
 ﻿using Yunu.Commerce.Catalog.Application.Products.GetProductById;
 using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
 using Xunit;
@@ -8,9 +9,32 @@ namespace Yunu.Commerce.Catalog.Application.Tests;
 
 public class GetProductByIdHandlerTests
 {
-    private static GoogleCategoryReference CreateGoogleCategory()
+    private const long ValidCanonicalTaxonomyNodeId = 1234;
+
+    private static CanonicalTaxonomyNodeId CreateCanonicalTaxonomyNodeId()
     {
-        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+        return new CanonicalTaxonomyNodeId(ValidCanonicalTaxonomyNodeId);
+    }
+
+    private static GetProductByIdHandler CreateHandler(
+        FakeProductRepository productRepository,
+        FakeSkuRepository skuRepository)
+    {
+        var canonicalTaxonomyRepository = new FakeCanonicalTaxonomyRepository();
+        var segmentCatalogRepository = new FakeSegmentCatalogRepository();
+
+        var node = CanonicalTaxonomyNode.CreateRoot(
+            CreateCanonicalTaxonomyNodeId(),
+            "running_shoes",
+            "Running Shoes",
+            "RUNNING SHOES",
+            description: null,
+            path: "/catalog/fashion/shoes/athletic_shoes/running_shoes",
+            status: CanonicalTaxonomyNodeStatus.Active);
+
+        canonicalTaxonomyRepository.Add(ValidCanonicalTaxonomyNodeId, node);
+
+        return new GetProductByIdHandler(productRepository, skuRepository, canonicalTaxonomyRepository, segmentCatalogRepository);
     }
 
     [Fact]
@@ -24,14 +48,14 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             "Tênis esportivo masculino para corrida e uso diário.",
             BrandId.New(),
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await productRepository.AddAsync(product, CancellationToken.None);
 
         var sku = Sku.Create(SkuId.New(), product.Id, new SkuCode("256GB-BLACK"));
         await skuRepository.AddAsync(sku, CancellationToken.None);
 
-        var handler = new GetProductByIdHandler(productRepository, skuRepository);
+        var handler = CreateHandler(productRepository, skuRepository);
         var query = new GetProductByIdQuery { ProductId = product.Id.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -41,8 +65,7 @@ public class GetProductByIdHandlerTests
         Assert.Equal("Apple iPhone 17 Pro", response.Name);
         Assert.Equal("Tênis esportivo masculino para corrida e uso diário.", response.Description);
         Assert.Equal(product.BrandId!.Value.Value, response.BrandId);
-        Assert.Equal(product.GoogleCategory.Id, response.GoogleCategory.Id);
-        Assert.Equal(product.GoogleCategory.Path, response.GoogleCategory.Path);
+        Assert.Equal(product.CanonicalTaxonomyNodeId.Value, response.Category.Id);
         Assert.Equal(ProductStatus.Draft.ToString(), response.Status);
 
         var skuResponse = Assert.Single(response.Skus);
@@ -61,11 +84,11 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             BrandId.New(),
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await productRepository.AddAsync(product, CancellationToken.None);
 
-        var handler = new GetProductByIdHandler(productRepository, skuRepository);
+        var handler = CreateHandler(productRepository, skuRepository);
         var query = new GetProductByIdQuery { ProductId = product.Id.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -85,11 +108,11 @@ public class GetProductByIdHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             brandId: null,
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await productRepository.AddAsync(product, CancellationToken.None);
 
-        var handler = new GetProductByIdHandler(productRepository, skuRepository);
+        var handler = CreateHandler(productRepository, skuRepository);
         var query = new GetProductByIdQuery { ProductId = product.Id.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -103,7 +126,7 @@ public class GetProductByIdHandlerTests
     {
         var productRepository = new FakeProductRepository();
         var skuRepository = new FakeSkuRepository();
-        var handler = new GetProductByIdHandler(productRepository, skuRepository);
+        var handler = CreateHandler(productRepository, skuRepository);
 
         var query = new GetProductByIdQuery { ProductId = Guid.NewGuid() };
 

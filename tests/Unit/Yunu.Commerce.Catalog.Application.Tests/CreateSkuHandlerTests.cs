@@ -2,15 +2,16 @@
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
 public class CreateSkuHandlerTests
 {
-    private static GoogleCategoryReference CreateGoogleCategory()
+    private static CanonicalTaxonomyNodeId CreateCanonicalTaxonomyNodeId()
     {
-        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+        return new CanonicalTaxonomyNodeId(1234);
     }
 
     private static Product CreateAndPersistProduct(FakeProductRepository productRepository)
@@ -20,7 +21,7 @@ public class CreateSkuHandlerTests
             new ProductName("Apple iPhone 17 Pro"),
             description: null,
             new BrandId(Guid.NewGuid()),
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         productRepository.AddAsync(product, CancellationToken.None).GetAwaiter().GetResult();
 

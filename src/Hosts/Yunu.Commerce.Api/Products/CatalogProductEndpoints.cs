@@ -1,5 +1,6 @@
 ﻿using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
+using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 
 namespace Yunu.Commerce.Api.Products;
 
@@ -37,7 +38,14 @@ public static class CatalogProductEndpoints
                 Name = request.Name,
                 Description = request.Description,
                 BrandId = request.BrandId,
-                GoogleCategoryId = request.GoogleCategoryId
+                CanonicalTaxonomyNodeId = request.CanonicalTaxonomyNodeId,
+                Segments = request.Segments
+                    .Select(s => new SegmentSelectionInput
+                    {
+                        Code = s.Code,
+                        OptionCodes = s.OptionCodes
+                    })
+                    .ToArray()
             };
 
             var result = await handler.HandleAsync(command, cancellationToken);

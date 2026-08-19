@@ -1,4 +1,5 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Products.Events;
 using Xunit;
@@ -7,23 +8,23 @@ namespace Yunu.Commerce.Catalog.Domain.Tests;
 
 public class ProductTests
 {
-    private static GoogleCategoryReference CreateGoogleCategory()
+    private static CanonicalTaxonomyNodeId CreateCanonicalTaxonomyNodeId()
     {
-        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+        return new CanonicalTaxonomyNodeId(1234);
     }
 
     private static Product CreateProduct(
         string name = "Apple iPhone 17 Pro",
         string? description = null,
         BrandId? brandId = null,
-        GoogleCategoryReference? googleCategory = null)
+        CanonicalTaxonomyNodeId? canonicalTaxonomyNodeId = null)
     {
         return Product.Create(
             ProductId.New(),
             new ProductName(name),
             description,
             brandId,
-            googleCategory ?? CreateGoogleCategory());
+            canonicalTaxonomyNodeId ?? CreateCanonicalTaxonomyNodeId());
     }
 
     [Fact]
@@ -61,17 +62,6 @@ public class ProductTests
     }
 
     [Fact]
-    public void Create_Should_Require_GoogleCategory()
-    {
-        Assert.Throws<ArgumentNullException>(() => Product.Create(
-            ProductId.New(),
-            new ProductName("Apple iPhone 17 Pro"),
-            description: null,
-            brandId: null,
-            googleCategory: null!));
-    }
-
-    [Fact]
     public void Create_Should_Accept_Null_BrandId()
     {
         var product = CreateProduct(brandId: null);
@@ -80,13 +70,13 @@ public class ProductTests
     }
 
     [Fact]
-    public void Create_Should_Store_GoogleCategory()
+    public void Create_Should_Store_CanonicalTaxonomyNodeId()
     {
-        var googleCategory = CreateGoogleCategory();
+        var canonicalTaxonomyNodeId = CreateCanonicalTaxonomyNodeId();
 
-        var product = CreateProduct(googleCategory: googleCategory);
+        var product = CreateProduct(canonicalTaxonomyNodeId: canonicalTaxonomyNodeId);
 
-        Assert.Equal(googleCategory, product.GoogleCategory);
+        Assert.Equal(canonicalTaxonomyNodeId, product.CanonicalTaxonomyNodeId);
     }
 
     [Fact]

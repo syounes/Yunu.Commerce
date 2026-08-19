@@ -2,6 +2,7 @@
 using MongoDB.Driver;
 using Testcontainers.MongoDb;
 using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 using Xunit;
@@ -23,9 +24,9 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
     private IMongoClient _mongoClient = null!;
     private MongoProductRepository _repository = null!;
 
-    private static GoogleCategoryReference CreateGoogleCategory()
+    private static CanonicalTaxonomyNodeId CreateCanonicalTaxonomyNodeId()
     {
-        return new GoogleCategoryReference(1234, "Apparel & Accessories > Shoes > Athletic Shoes");
+        return new CanonicalTaxonomyNodeId(1234);
     }
 
     public async Task InitializeAsync()
@@ -56,7 +57,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("Apple iPhone 17 Pro"),
             "Apple's latest flagship smartphone.",
             BrandId.New(),
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await _repository.AddAsync(product, CancellationToken.None);
 
@@ -67,7 +68,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
         Assert.Equal(product.Name, retrieved.Name);
         Assert.Equal(product.Description, retrieved.Description);
         Assert.Equal(product.BrandId, retrieved.BrandId);
-        Assert.Equal(product.GoogleCategory, retrieved.GoogleCategory);
+        Assert.Equal(product.CanonicalTaxonomyNodeId, retrieved.CanonicalTaxonomyNodeId);
         Assert.Equal(product.Status, retrieved.Status);
     }
 
@@ -79,7 +80,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("No Description Product"),
             description: null,
             BrandId.New(),
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await _repository.AddAsync(product, CancellationToken.None);
 
@@ -97,7 +98,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("No Internal Classification Product"),
             description: null,
             brandId: null,
-            CreateGoogleCategory());
+            CreateCanonicalTaxonomyNodeId());
 
         await _repository.AddAsync(product, CancellationToken.None);
 
@@ -105,7 +106,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
 
         Assert.NotNull(retrieved);
         Assert.Null(retrieved!.BrandId);
-        Assert.Equal(product.GoogleCategory, retrieved.GoogleCategory);
+        Assert.Equal(product.CanonicalTaxonomyNodeId, retrieved.CanonicalTaxonomyNodeId);
     }
 
     [Fact]
@@ -124,7 +125,7 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             new ProductName("Status RoundTrip Product"),
             description: null,
             BrandId.New(),
-            CreateGoogleCategory(),
+            CreateCanonicalTaxonomyNodeId(),
             ProductStatus.PendingReview);
 
         await _repository.AddAsync(product, CancellationToken.None);
