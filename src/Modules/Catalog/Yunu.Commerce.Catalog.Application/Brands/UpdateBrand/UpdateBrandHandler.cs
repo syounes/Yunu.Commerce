@@ -1,14 +1,17 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Brands;
+using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
 
 public sealed class UpdateBrandHandler
 {
     private readonly IBrandRepository _repository;
+    private readonly IProductRepository _productRepository;
 
-    public UpdateBrandHandler(IBrandRepository repository)
+    public UpdateBrandHandler(IBrandRepository repository, IProductRepository productRepository)
     {
         _repository = repository;
+        _productRepository = productRepository;
     }
 
     public async Task HandleAsync(UpdateBrandCommand command, CancellationToken cancellationToken)
@@ -18,6 +21,11 @@ public sealed class UpdateBrandHandler
         if (brand is null)
         {
             throw new KeyNotFoundException($"Brand '{command.BrandId}' not found.");
+        }
+
+        if (await _productRepository.ExistsByBrandIdAsync(brandId, cancellationToken))
+        {
+            throw new BrandInUseException($"Brand '{command.BrandId}' is used by at least one Product and cannot be updated.");
         }
 
         if (command.Name is { } newName)

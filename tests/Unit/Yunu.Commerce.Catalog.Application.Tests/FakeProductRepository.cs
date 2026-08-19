@@ -35,7 +35,18 @@ internal sealed class FakeProductRepository : IProductRepository
 
     public Task<bool> ExistsByBrandIdAsync(BrandId brandId, CancellationToken cancellationToken)
     {
-        var exists = _products.Values.Any(p => p.BrandId == brandId);
+        var exists = _products.Values.Any(p => p.BrandId == brandId) || _brandIdsInUse.Contains(brandId);
         return Task.FromResult(exists);
+    }
+
+    private readonly HashSet<BrandId> _brandIdsInUse = new();
+
+    /// <summary>
+    /// Test-only helper to simulate a Brand being referenced by a Product,
+    /// without requiring a fully constructed Product aggregate.
+    /// </summary>
+    public void MarkBrandInUse(BrandId brandId)
+    {
+        _brandIdsInUse.Add(brandId);
     }
 }

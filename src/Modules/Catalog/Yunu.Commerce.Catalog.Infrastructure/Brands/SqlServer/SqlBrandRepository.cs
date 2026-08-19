@@ -79,6 +79,22 @@ public sealed class SqlBrandRepository : IBrandRepository
         return ReadBrand(reader);
     }
 
+    public async Task DeleteAsync(BrandId id, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            DELETE FROM Catalog.Brands
+            WHERE BrandId = @BrandId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@BrandId", id.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<Brand?> GetByCodeAsync(BrandCode code, CancellationToken cancellationToken)
     {
         const string sql = """

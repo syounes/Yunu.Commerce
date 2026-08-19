@@ -15,9 +15,15 @@ using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
 using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
+using Yunu.Commerce.Catalog.Application.Brands.DeleteBrand;
 using Yunu.Commerce.Catalog.Application.Brands.GetBrand;
 using Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
 using Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTaxonomyNode;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.DeleteCanonicalTaxonomyNode;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyChildren;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyNodeById;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.UpdateCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 
 namespace Yunu.Commerce.Catalog.Application;
@@ -42,7 +48,14 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<CreateBrandHandler>();
         services.AddScoped<GetBrandHandler>();
         services.AddScoped<UpdateBrandHandler>();
+        services.AddScoped<DeleteBrandHandler>();
         services.AddScoped<Yunu.Commerce.Catalog.Application.Brands.ResolveBrand.IBrandResolver, Yunu.Commerce.Catalog.Application.Brands.ResolveBrand.BrandResolver>();
+
+        services.AddScoped<CreateCanonicalTaxonomyNodeHandler>();
+        services.AddScoped<GetCanonicalTaxonomyNodeByIdHandler>();
+        services.AddScoped<GetCanonicalTaxonomyChildrenHandler>();
+        services.AddScoped<UpdateCanonicalTaxonomyNodeHandler>();
+        services.AddScoped<DeleteCanonicalTaxonomyNodeHandler>();
 
         services.AddScoped<CreateProductProposalHandler>();
         services.AddScoped<GetProductProposalByIdHandler>();

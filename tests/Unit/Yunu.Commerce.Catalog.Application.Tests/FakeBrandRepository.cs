@@ -41,4 +41,10 @@ internal sealed class FakeBrandRepository : IBrandRepository
         _brands[brand.Id.Value] = brand;
         return Task.CompletedTask;
     }
+
+    public Task DeleteAsync(BrandId id, CancellationToken cancellationToken)
+    {
+        _brands.Remove(id.Value);
+        return Task.CompletedTask;
+    }
 }

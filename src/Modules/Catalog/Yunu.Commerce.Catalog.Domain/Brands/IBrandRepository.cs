@@ -6,6 +6,8 @@ public interface IBrandRepository
 
     Task UpdateAsync(Brand brand, CancellationToken cancellationToken);
 
+    Task DeleteAsync(BrandId id, CancellationToken cancellationToken);
+
     Task<Brand?> GetByIdAsync(BrandId id, CancellationToken cancellationToken);
 
     Task<Brand?> GetByCodeAsync(BrandCode code, CancellationToken cancellationToken);
