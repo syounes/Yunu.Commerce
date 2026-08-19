@@ -3,7 +3,10 @@
 namespace Yunu.Commerce.Catalog.Application.Tests;
 
 /// <summary>
-/// Test-only fake for ICanonicalTaxonomyRepository.
+/// Test-only fake for ICanonicalTaxonomyRepository. Derives parent-child
+/// relationships from <see cref="CanonicalTaxonomyNode.ParentId"/> so that
+/// <see cref="HasChildrenAsync"/> correctly reflects nodes added via
+/// <see cref="Add"/> or <see cref="AddAsync"/>.
 /// </summary>
 internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyRepository
 {
@@ -15,6 +18,7 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
     {
         var id = node.Id.Value == 0 ? _nextId++ : node.Id.Value;
         _nodes[id] = node;
+        RegisterParentRelationship(id, node);
         return Task.FromResult(new CanonicalTaxonomyNodeId(id));
     }
 
@@ -56,5 +60,25 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
     public void Add(long id, CanonicalTaxonomyNode node)
     {
         _nodes[id] = node;
+        RegisterParentRelationship(id, node);
+    }
+
+    private void RegisterParentRelationship(long id, CanonicalTaxonomyNode node)
+    {
+        if (node.ParentId is not { } parentId)
+        {
+            return;
+        }
+
+        if (!_children.TryGetValue(parentId.Value, out var childIds))
+        {
+            childIds = new List<long>();
+            _children[parentId.Value] = childIds;
+        }
+
+        if (!childIds.Contains(id))
+        {
+            childIds.Add(id);
+        }
     }
 }
