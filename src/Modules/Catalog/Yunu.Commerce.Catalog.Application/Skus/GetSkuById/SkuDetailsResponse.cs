@@ -17,5 +17,11 @@ public sealed class SkuDetailsResponse
 
     public required string Status { get; init; }
 
+    /// <summary>
+    /// Derived, non-persisted Commercial Eligibility (docs/adr/0012):
+    /// <c>Product.Status == Active &amp;&amp; Sku.Status == Active</c>.
+    /// </summary>
+    public required bool CommerciallyEligible { get; init; }
+
     public IReadOnlyCollection<SkuAttributeResponse> Attributes { get; init; } = Array.Empty<SkuAttributeResponse>();
 }

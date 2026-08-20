@@ -10,10 +10,12 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Application.Products.CreateProduct;
 using Yunu.Commerce.Catalog.Application.Products.GetProductById;
+using Yunu.Commerce.Catalog.Application.Products.TransitionProductStatus;
 using Yunu.Commerce.Catalog.Application.ProductProposals;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
+using Yunu.Commerce.Catalog.Application.Skus.TransitionSkuStatus;
 using Yunu.Commerce.Catalog.Application.Brands.CreateBrand;
 using Yunu.Commerce.Catalog.Application.Brands.DeleteBrand;
 using Yunu.Commerce.Catalog.Application.Brands.GetBrand;
@@ -51,9 +53,11 @@ public static class CatalogApplicationServiceCollectionExtensions
     {
         services.AddScoped<CreateProductHandler>();
         services.AddScoped<GetProductByIdHandler>();
+        services.AddScoped<TransitionProductStatusHandler>();
         services.AddScoped<CreateSkuHandler>();
         services.AddScoped<GetSkuByIdHandler>();
         services.AddScoped<GetSkusByProductIdHandler>();
+        services.AddScoped<TransitionSkuStatusHandler>();
 
         services.AddScoped<SegmentAssignmentResolver>();
 

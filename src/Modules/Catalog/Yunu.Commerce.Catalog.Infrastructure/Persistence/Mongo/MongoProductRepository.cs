@@ -75,4 +75,20 @@ public sealed class MongoProductRepository : IProductRepository
             .Limit(1)
             .AnyAsync(cancellationToken);
     }
+
+    public async Task<bool> UpdateStatusAsync(
+        ProductId id,
+        ProductStatus expectedCurrentStatus,
+        ProductStatus newStatus,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ProductDocument>.Filter.Where(d =>
+            d.Id == id.Value && d.Status == expectedCurrentStatus.ToString());
+
+        var update = Builders<ProductDocument>.Update.Set(d => d.Status, newStatus.ToString());
+
+        var result = await _collection.UpdateOneAsync(filter, update, options: null, cancellationToken);
+
+        return result.MatchedCount > 0;
+    }
 }

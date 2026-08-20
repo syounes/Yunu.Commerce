@@ -12,10 +12,12 @@ namespace Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
 public sealed class GetSkusByProductIdHandler
 {
     private readonly ISkuRepository _skuRepository;
+    private readonly IProductRepository _productRepository;
 
-    public GetSkusByProductIdHandler(ISkuRepository skuRepository)
+    public GetSkusByProductIdHandler(ISkuRepository skuRepository, IProductRepository productRepository)
     {
         _skuRepository = skuRepository;
+        _productRepository = productRepository;
     }
 
     public async Task<IReadOnlyCollection<SkuDetailsResponse>> HandleAsync(GetSkusByProductIdQuery query, CancellationToken cancellationToken)
@@ -23,6 +25,8 @@ public sealed class GetSkusByProductIdHandler
         var productId = new ProductId(query.ProductId);
 
         var skus = await _skuRepository.GetByProductIdAsync(productId, cancellationToken);
+        var product = await _productRepository.GetByIdAsync(productId, cancellationToken);
+        var productStatus = product?.Status ?? ProductStatus.Draft;
 
         return skus
             .Select(sku => new SkuDetailsResponse
@@ -32,6 +36,7 @@ public sealed class GetSkusByProductIdHandler
                 Code = sku.Code.Value,
                 Gtin = sku.Gtin,
                 Status = sku.Status.ToString(),
+                CommerciallyEligible = CommercialEligibility.CommercialEligibilityPolicy.IsEligible(productStatus, sku.Status),
                 Attributes = sku.Attributes.Select(SkuAttributeResponseMapper.ToResponse).ToArray()
             })
             .ToArray();

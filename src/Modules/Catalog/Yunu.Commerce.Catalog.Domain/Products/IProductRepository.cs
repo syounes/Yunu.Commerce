@@ -62,4 +62,20 @@ public interface IProductRepository
     Task<bool> ExistsBySegmentOptionIdAsync(
         Segments.SegmentOptionId segmentOptionId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomically updates this Product's persisted Status, using
+    /// <paramref name="expectedCurrentStatus"/> as an optimistic-concurrency
+    /// guard against the currently stored value
+    /// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md).
+    /// Returns <c>false</c> when no document matched (either the Product does
+    /// not exist, or its persisted Status no longer equals
+    /// <paramref name="expectedCurrentStatus"/>), signalling the caller to
+    /// reload and retry.
+    /// </summary>
+    Task<bool> UpdateStatusAsync(
+        ProductId id,
+        ProductStatus expectedCurrentStatus,
+        ProductStatus newStatus,
+        CancellationToken cancellationToken);
 }

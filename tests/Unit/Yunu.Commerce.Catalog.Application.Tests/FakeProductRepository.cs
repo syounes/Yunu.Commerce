@@ -97,4 +97,19 @@ internal sealed class FakeProductRepository : IProductRepository
     {
         _segmentOptionIdsInUse.Add(segmentOptionId);
     }
+
+    public Task<bool> UpdateStatusAsync(
+        ProductId id,
+        ProductStatus expectedCurrentStatus,
+        ProductStatus newStatus,
+        CancellationToken cancellationToken)
+    {
+        if (!_products.TryGetValue(id.Value, out var product) || product.Status != expectedCurrentStatus)
+        {
+            return Task.FromResult(false);
+        }
+
+        product.TransitionTo(newStatus);
+        return Task.FromResult(true);
+    }
 }

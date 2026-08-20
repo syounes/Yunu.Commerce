@@ -105,7 +105,8 @@ public sealed class GetProductByIdHandler
                 {
                     SkuId = sku.Id.Value,
                     Code = sku.Code.Value,
-                    Status = sku.Status.ToString()
+                    Status = sku.Status.ToString(),
+                    CommerciallyEligible = CommercialEligibility.CommercialEligibilityPolicy.IsEligible(product.Status, sku.Status)
                 })
                 .ToArray()
         };

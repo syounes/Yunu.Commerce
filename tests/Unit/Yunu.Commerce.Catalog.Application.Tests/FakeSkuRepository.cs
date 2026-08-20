@@ -70,4 +70,39 @@ internal sealed class FakeSkuRepository : ISkuRepository
     {
         _segmentOptionIdsInUse.Add(segmentOptionId);
     }
+
+    public Task<bool> UpdateStatusAsync(
+        SkuId id,
+        SkuStatus expectedCurrentStatus,
+        SkuStatus newStatus,
+        CancellationToken cancellationToken)
+    {
+        if (!_skus.TryGetValue(id.Value, out var sku) || sku.Status != expectedCurrentStatus)
+        {
+            return Task.FromResult(false);
+        }
+
+        switch (newStatus)
+        {
+            case SkuStatus.Active:
+                sku.Activate();
+                break;
+            case SkuStatus.Inactive:
+                sku.Block();
+                break;
+            case SkuStatus.Archived:
+                sku.Discontinue();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(newStatus), newStatus, "Unsupported Sku status transition.");
+        }
+
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> ExistsNonArchivedByProductIdAsync(ProductId productId, CancellationToken cancellationToken)
+    {
+        var exists = _skus.Values.Any(sku => sku.ProductId == productId && sku.Status != SkuStatus.Archived);
+        return Task.FromResult(exists);
+    }
 }

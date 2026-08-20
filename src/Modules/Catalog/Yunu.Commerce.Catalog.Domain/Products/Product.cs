@@ -7,6 +7,19 @@ using Yunu.Commerce.SharedKernel;
 namespace Yunu.Commerce.Catalog.Domain.Products;
 
 /// <summary>
+/// Thrown when an invalid Status transition is attempted on a
+/// <see cref="Product"/> (docs task: "Yunu.Commerce V10 - Product + Sku
+/// Lifecycle Boundary, Commercial Eligibility e API Governance"), mirroring
+/// <see cref="Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy.InvalidCanonicalTaxonomyNodeStatusTransitionException"/>.
+/// </summary>
+public sealed class InvalidProductStatusTransitionException : Exception
+{
+    public InvalidProductStatusTransitionException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// Product Aggregate Root (docs/domains/catalog.md §4-§6).
 /// Owns the canonical descriptive identity of a commercial product.
 ///
@@ -28,12 +41,26 @@ namespace Yunu.Commerce.Catalog.Domain.Products;
 /// Segment assignments (docs task §14) are explicit, resolved-and-validated-by-
 /// Application selections; Product does not consult SQL Server itself.
 ///
-/// Lifecycle transition behavior (Activate/Deactivate/Archive/SubmitForReview) is
-/// intentionally deferred until a documented use case defines the transition rules
-/// (docs/domains/catalog.md §21).
+/// Lifecycle (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md):
+/// Draft -&gt; Active/Archived; Active -&gt; Inactive/Archived;
+/// Inactive -&gt; Active/Archived; Archived is terminal. This Aggregate only
+/// enforces the state machine itself; it has no visibility into Sku usage,
+/// so the Archive usage guard (no non-Archived Sku may exist) is enforced by
+/// Catalog.Application before <see cref="TransitionTo"/> is called for an
+/// Archive transition. Product status is never propagated to/from Sku: each
+/// Aggregate's lifecycle is fully independent (docs/adr/0010 preserved
+/// unchanged).
 /// </summary>
 public sealed class Product
 {
+    private static readonly Dictionary<ProductStatus, HashSet<ProductStatus>> AllowedTransitions = new()
+    {
+        [ProductStatus.Draft] = new HashSet<ProductStatus> { ProductStatus.Active, ProductStatus.Archived },
+        [ProductStatus.Active] = new HashSet<ProductStatus> { ProductStatus.Inactive, ProductStatus.Archived },
+        [ProductStatus.Inactive] = new HashSet<ProductStatus> { ProductStatus.Active, ProductStatus.Archived },
+        [ProductStatus.Archived] = new HashSet<ProductStatus>()
+    };
+
     private readonly List<IDomainEvent> _domainEvents = new();
     private readonly List<SegmentAssignment> _segmentAssignments = new();
 
@@ -212,6 +239,34 @@ public sealed class Product
     private SegmentAssignment? FindAssignment(SegmentDefinitionId segmentDefinitionId)
     {
         return _segmentAssignments.FirstOrDefault(a => a.SegmentDefinitionId == segmentDefinitionId);
+    }
+
+    /// <summary>
+    /// Transitions this Product's lifecycle Status (docs/adr/0012). Only the
+    /// state machine itself is enforced here: Draft -&gt; Active/Archived,
+    /// Active -&gt; Inactive/Archived, Inactive -&gt; Active/Archived, Archived is
+    /// terminal. Cross-aggregate usage guards (e.g. no non-Archived Sku may
+    /// exist before archiving this Product) are the Application layer's
+    /// responsibility and must be checked before calling this method for an
+    /// Archive transition. This method never inspects or mutates Sku state.
+    /// </summary>
+    public void TransitionTo(ProductStatus newStatus)
+    {
+        if (newStatus == Status)
+        {
+            return;
+        }
+
+        if (!AllowedTransitions[Status].Contains(newStatus))
+        {
+            throw new InvalidProductStatusTransitionException(
+                $"Cannot transition Product status from {Status} to {newStatus}.");
+        }
+
+        var previousStatus = Status;
+        Status = newStatus;
+
+        _domainEvents.Add(new ProductStatusChangedDomainEvent(Id, previousStatus, newStatus));
     }
 
     public void ClearDomainEvents()

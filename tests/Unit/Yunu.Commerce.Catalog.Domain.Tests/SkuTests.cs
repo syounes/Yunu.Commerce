@@ -100,6 +100,36 @@ public class SkuTests
     }
 
     [Fact]
+    public void Activate_After_Discontinue_Should_Throw()
+    {
+        var sku = CreateSku();
+        sku.Discontinue();
+
+        Assert.Throws<InvalidSkuStatusTransitionException>(() => sku.Activate());
+    }
+
+    [Fact]
+    public void Block_After_Discontinue_Should_Throw()
+    {
+        var sku = CreateSku();
+        sku.Discontinue();
+
+        Assert.Throws<InvalidSkuStatusTransitionException>(() => sku.Block());
+    }
+
+    [Fact]
+    public void Discontinue_When_Already_Archived_Should_Not_Raise_Event()
+    {
+        var sku = CreateSku();
+        sku.Discontinue();
+        sku.ClearDomainEvents();
+
+        sku.Discontinue();
+
+        Assert.Empty(sku.DomainEvents);
+    }
+
+    [Fact]
     public void ClearDomainEvents_Should_Empty_Collection()
     {
         var sku = CreateSku();

@@ -15,7 +15,7 @@ public class GetSkuByIdHandlerTests
         var sku = Sku.Create(SkuId.New(), ProductId.New(), new SkuCode("256GB-BLACK"), "0000000000001");
         await repository.AddAsync(sku, CancellationToken.None);
 
-        var handler = new GetSkuByIdHandler(repository);
+        var handler = new GetSkuByIdHandler(repository, new FakeProductRepository());
         var query = new GetSkuByIdQuery { SkuId = sku.Id.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -32,7 +32,7 @@ public class GetSkuByIdHandlerTests
     public async Task Handle_With_NonExistent_Sku_Should_Return_Null()
     {
         var repository = new FakeSkuRepository();
-        var handler = new GetSkuByIdHandler(repository);
+        var handler = new GetSkuByIdHandler(repository, new FakeProductRepository());
 
         var query = new GetSkuByIdQuery { SkuId = Guid.NewGuid() };
 

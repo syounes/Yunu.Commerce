@@ -1,13 +1,21 @@
-﻿using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
+﻿using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkuById;
 using Yunu.Commerce.Catalog.Application.Skus.GetSkusByProductId;
+using Yunu.Commerce.Catalog.Application.Skus.TransitionSkuStatus;
 
 namespace Yunu.Commerce.Api.Skus;
 
 /// <summary>
 /// Maps the Catalog Sku HTTP endpoints. Sku is now an independent Aggregate Root
-/// (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md). This class
-/// only translates HTTP input/output to/from existing Application commands, queries
+/// (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).
+///
+/// Direct public creation of a Sku is intentionally not exposed here
+/// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md):
+/// materialized Skus are only created through the governed ProductProposal
+/// conversion flow. <see cref="Yunu.Commerce.Catalog.Application.Skus.CreateSku.CreateSkuHandler"/>
+/// remains an internal Application service consumed by that flow, not by public HTTP.
+///
+/// This class only translates HTTP input/output to/from existing Application commands, queries
 /// and handlers. It contains no Domain rules, no repository logic, and never
 /// instantiates Sku or touches MongoDB directly.
 /// </summary>
@@ -15,11 +23,6 @@ public static class CatalogSkuEndpoints
 {
     public static IEndpointRouteBuilder MapCatalogSkuEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/catalog/products/{productId}/skus", CreateSkuAsync)
-            .Produces<CreateSkuResponse>(StatusCodes.Status201Created)
-            .Produces(StatusCodes.Status404NotFound)
-            .ProducesProblem(StatusCodes.Status400BadRequest);
-
         app.MapGet("/api/catalog/products/{productId}/skus", GetSkusByProductIdAsync)
             .Produces<IReadOnlyCollection<SkuDetailsResponse>>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest);
@@ -29,57 +32,57 @@ public static class CatalogSkuEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
+        app.MapPost("/api/catalog/skus/{skuId}/status", TransitionStatusAsync)
+            .WithSummary("Transition a Sku's lifecycle Status")
+            .WithDescription("Applies an explicit Draft/Active/Inactive/Archived lifecycle transition (docs/adr/0012). Blocked while the owning Product is Archived, except when transitioning to Archived.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return app;
     }
 
-    private static async Task<IResult> CreateSkuAsync(
-        string productId,
-        CreateSkuRequest request,
-        CreateSkuHandler handler,
+    private static async Task<IResult> TransitionStatusAsync(
+        string skuId,
+        TransitionSkuStatusRequest request,
+        TransitionSkuStatusHandler handler,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(productId, out var parsedProductId))
+        if (!Guid.TryParse(skuId, out var parsedSkuId))
         {
             return Results.Problem(
-                detail: $"'{productId}' is not a valid Product identifier.",
+                detail: $"'{skuId}' is not a valid Sku identifier.",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
         try
         {
-            var command = new CreateSkuCommand
+            var command = new TransitionSkuStatusCommand
             {
-                ProductId = parsedProductId,
-                Code = request.Code,
-                Gtin = request.Gtin,
-                Attributes = (request.Attributes ?? Array.Empty<SkuAttributeRequest>())
-                    .Select(a => new SkuAttributeInput
-                    {
-                        Code = a.Code,
-                        Sequence = a.Sequence,
-                        Value = a.Value,
-                        OptionCode = a.OptionCode
-                    })
-                    .ToArray()
+                SkuId = parsedSkuId,
+                Status = request.Status
             };
 
-            var result = await handler.HandleAsync(command, cancellationToken);
+            await handler.HandleAsync(command, cancellationToken);
 
-            var response = new CreateSkuResponse
-            {
-                SkuId = result.SkuId,
-                Attributes = result.Attributes
-            };
-
-            return Results.Created($"/api/catalog/skus/{result.SkuId}", response);
+            return Results.NoContent();
         }
         catch (ArgumentException ex)
         {
             return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("Product") && ex.Message.Contains("does not exist"))
+        catch (KeyNotFoundException ex)
         {
             return Results.NotFound(new { detail = ex.Message });
+        }
+        catch (Yunu.Commerce.Catalog.Domain.Skus.InvalidSkuStatusTransitionException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
+        }
+        catch (Yunu.Commerce.Catalog.Application.Skus.ProductArchivedException ex)
+        {
+            return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status409Conflict);
         }
     }
 
@@ -134,4 +137,13 @@ public static class CatalogSkuEndpoints
             return Results.Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest);
         }
     }
+}
+
+/// <summary>
+/// HTTP request body for the Sku lifecycle Status transition endpoint
+/// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md).
+/// </summary>
+public sealed class TransitionSkuStatusRequest
+{
+    public required string Status { get; init; }
 }

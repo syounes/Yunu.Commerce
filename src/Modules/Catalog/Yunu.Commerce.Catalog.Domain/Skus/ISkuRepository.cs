@@ -41,4 +41,30 @@ public interface ISkuRepository
     Task<bool> ExistsBySegmentOptionIdAsync(
         Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId segmentOptionId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomically updates this Sku's persisted Status, using
+    /// <paramref name="expectedCurrentStatus"/> as an optimistic-concurrency
+    /// guard against the currently stored value
+    /// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md).
+    /// Returns <c>false</c> when no document matched (either the Sku does not
+    /// exist, or its persisted Status no longer equals
+    /// <paramref name="expectedCurrentStatus"/>), signalling the caller to
+    /// reload and retry.
+    /// </summary>
+    Task<bool> UpdateStatusAsync(
+        SkuId id,
+        SkuStatus expectedCurrentStatus,
+        SkuStatus newStatus,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether any Sku for the given Product currently has a Status other
+    /// than Archived (docs/adr/0012). Used by Catalog.Application to guard a
+    /// Product Archive transition: a Product cannot be archived while it
+    /// still has a non-Archived Sku.
+    /// </summary>
+    Task<bool> ExistsNonArchivedByProductIdAsync(
+        ProductId productId,
+        CancellationToken cancellationToken);
 }

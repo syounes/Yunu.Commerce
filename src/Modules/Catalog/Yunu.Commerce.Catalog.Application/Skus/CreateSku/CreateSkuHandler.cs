@@ -46,10 +46,15 @@ public sealed class CreateSkuHandler
     {
         var productId = new ProductId(command.ProductId);
 
-        var productExists = await _productRepository.GetByIdAsync(productId, cancellationToken);
-        if (productExists is null)
+        var product = await _productRepository.GetByIdAsync(productId, cancellationToken);
+        if (product is null)
         {
             throw new InvalidOperationException($"Product with ID '{command.ProductId}' does not exist. Cannot create Sku for non-existent Product.");
+        }
+
+        if (product.Status == ProductStatus.Archived)
+        {
+            throw new InvalidOperationException($"Product with ID '{command.ProductId}' is Archived. Cannot create a Sku under an Archived Product.");
         }
 
         var skuId = SkuId.New();

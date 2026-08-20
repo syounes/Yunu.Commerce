@@ -118,4 +118,78 @@ public class ProductTests
 
         Assert.Empty(product.DomainEvents);
     }
+
+    [Theory]
+    [InlineData(ProductStatus.Draft, ProductStatus.Active)]
+    [InlineData(ProductStatus.Draft, ProductStatus.Archived)]
+    [InlineData(ProductStatus.Active, ProductStatus.Inactive)]
+    [InlineData(ProductStatus.Active, ProductStatus.Archived)]
+    [InlineData(ProductStatus.Inactive, ProductStatus.Active)]
+    [InlineData(ProductStatus.Inactive, ProductStatus.Archived)]
+    public void TransitionTo_allows_documented_transitions(ProductStatus from, ProductStatus to)
+    {
+        var product = CreateProduct();
+
+        if (from != ProductStatus.Draft)
+        {
+            product.TransitionTo(ProductStatus.Active);
+            if (from == ProductStatus.Inactive)
+            {
+                product.TransitionTo(ProductStatus.Inactive);
+            }
+        }
+
+        product.TransitionTo(to);
+
+        Assert.Equal(to, product.Status);
+    }
+
+    [Theory]
+    [InlineData(ProductStatus.Archived, ProductStatus.Draft)]
+    [InlineData(ProductStatus.Archived, ProductStatus.Active)]
+    [InlineData(ProductStatus.Archived, ProductStatus.Inactive)]
+    public void TransitionTo_from_archived_always_throws(ProductStatus from, ProductStatus to)
+    {
+        var product = CreateProduct();
+        product.TransitionTo(ProductStatus.Archived);
+
+        Assert.Equal(ProductStatus.Archived, from);
+
+        Assert.Throws<InvalidProductStatusTransitionException>(() => product.TransitionTo(to));
+    }
+
+    [Fact]
+    public void TransitionTo_same_status_is_a_no_op()
+    {
+        var product = CreateProduct();
+        product.TransitionTo(ProductStatus.Active);
+        product.ClearDomainEvents();
+
+        product.TransitionTo(ProductStatus.Active);
+
+        Assert.Equal(ProductStatus.Active, product.Status);
+        Assert.Empty(product.DomainEvents);
+    }
+
+    [Fact]
+    public void TransitionTo_draft_to_inactive_directly_throws()
+    {
+        var product = CreateProduct();
+
+        Assert.Throws<InvalidProductStatusTransitionException>(() => product.TransitionTo(ProductStatus.Inactive));
+    }
+
+    [Fact]
+    public void TransitionTo_raises_ProductStatusChangedDomainEvent()
+    {
+        var product = CreateProduct();
+        product.ClearDomainEvents();
+
+        product.TransitionTo(ProductStatus.Active);
+
+        var domainEvent = Assert.Single(product.DomainEvents);
+        var statusChanged = Assert.IsType<ProductStatusChangedDomainEvent>(domainEvent);
+        Assert.Equal(ProductStatus.Draft, statusChanged.PreviousStatus);
+        Assert.Equal(ProductStatus.Active, statusChanged.NewStatus);
+    }
 }

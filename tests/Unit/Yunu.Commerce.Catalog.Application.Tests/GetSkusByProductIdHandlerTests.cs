@@ -23,7 +23,7 @@ public class GetSkusByProductIdHandlerTests
         await repository.AddAsync(sku2, CancellationToken.None);
         await repository.AddAsync(otherSku, CancellationToken.None);
 
-        var handler = new GetSkusByProductIdHandler(repository);
+        var handler = new GetSkusByProductIdHandler(repository, new FakeProductRepository());
         var query = new GetSkusByProductIdQuery { ProductId = productId.Value };
 
         var response = await handler.HandleAsync(query, CancellationToken.None);
@@ -36,7 +36,7 @@ public class GetSkusByProductIdHandlerTests
     public async Task Handle_With_No_Matching_Skus_Should_Return_Empty_Collection()
     {
         var repository = new FakeSkuRepository();
-        var handler = new GetSkusByProductIdHandler(repository);
+        var handler = new GetSkusByProductIdHandler(repository, new FakeProductRepository());
 
         var query = new GetSkusByProductIdQuery { ProductId = Guid.NewGuid() };
 

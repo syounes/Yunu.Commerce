@@ -126,13 +126,13 @@ public sealed class MongoProductRepositoryTests : IAsyncLifetime
             description: null,
             BrandId.New(),
             CreateCanonicalTaxonomyNodeId(),
-            ProductStatus.PendingReview);
+            ProductStatus.Archived);
 
         await _repository.AddAsync(product, CancellationToken.None);
 
         var retrieved = await _repository.GetByIdAsync(product.Id, CancellationToken.None);
 
         Assert.NotNull(retrieved);
-        Assert.Equal(ProductStatus.PendingReview, retrieved!.Status);
+        Assert.Equal(ProductStatus.Archived, retrieved!.Status);
     }
 }

@@ -8,6 +8,17 @@ using Yunu.Commerce.SharedKernel;
 namespace Yunu.Commerce.Catalog.Domain.Skus;
 
 /// <summary>
+/// Thrown when an invalid Status transition is attempted on a <see cref="Sku"/>
+/// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md).
+/// </summary>
+public sealed class InvalidSkuStatusTransitionException : Exception
+{
+    public InvalidSkuStatusTransitionException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// Sku Aggregate Root (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md).
 /// Sku is an independent Aggregate that references its owning Product only by
 /// identity (<see cref="ProductId"/>). Sku has its own lifecycle, persistence
@@ -20,9 +31,27 @@ namespace Yunu.Commerce.Catalog.Domain.Skus;
 /// Catalog.Application against SQL Server before this Aggregate is asked to
 /// assign an attribute; Sku only enforces the invariants that do not depend
 /// on external reference data (docs task, "Architectural boundaries" §6).
+///
+/// Lifecycle (docs/adr/0012): Draft -&gt; Active/Inactive/Archived;
+/// Active -&gt; Inactive/Archived; Inactive -&gt; Active/Archived; Archived is
+/// terminal. This Aggregate only enforces the state machine itself; the
+/// cross-aggregate guard preventing a Sku from leaving Archived while its
+/// Product is Archived, and preventing a Sku from being (re)activated while
+/// its Product is Archived, is enforced by Catalog.Application before these
+/// methods are called. Sku status is never propagated to/from Product: each
+/// Aggregate's lifecycle is fully independent (docs/adr/0010 preserved
+/// unchanged).
 /// </summary>
 public sealed class Sku
 {
+    private static readonly Dictionary<SkuStatus, HashSet<SkuStatus>> AllowedTransitions = new()
+    {
+        [SkuStatus.Draft] = new HashSet<SkuStatus> { SkuStatus.Active, SkuStatus.Inactive, SkuStatus.Archived },
+        [SkuStatus.Active] = new HashSet<SkuStatus> { SkuStatus.Inactive, SkuStatus.Archived },
+        [SkuStatus.Inactive] = new HashSet<SkuStatus> { SkuStatus.Active, SkuStatus.Archived },
+        [SkuStatus.Archived] = new HashSet<SkuStatus>()
+    };
+
     private readonly List<IDomainEvent> _domainEvents = new();
     private readonly List<SkuAttribute> _attributes = new();
     private readonly List<SegmentAssignment> _segmentAssignments = new();
@@ -99,47 +128,50 @@ public sealed class Sku
 
 
     /// <summary>
-    /// Transitions the Sku to Active. No documented invariant currently restricts
-    /// which prior statuses may activate; kept simple until lifecycle rules are
-    /// formally defined (docs/domains/catalog.md §20).
+    /// Transitions the Sku to Active, enforcing the lifecycle state machine
+    /// (docs/adr/0012). Cross-aggregate guards involving the owning Product's
+    /// status must be checked by Catalog.Application before calling this
+    /// method.
     /// </summary>
     public void Activate()
     {
-        if (Status == SkuStatus.Active)
-        {
-            return;
-        }
-
-        Status = SkuStatus.Active;
-        _domainEvents.Add(new SkuActivatedDomainEvent(Id, ProductId));
+        TransitionTo(SkuStatus.Active, () => new SkuActivatedDomainEvent(Id, ProductId));
     }
 
     /// <summary>
-    /// Transitions the Sku to Inactive ("blocked").
+    /// Transitions the Sku to Inactive ("blocked"), enforcing the lifecycle
+    /// state machine (docs/adr/0012).
     /// </summary>
     public void Block()
     {
-        if (Status == SkuStatus.Inactive)
-        {
-            return;
-        }
-
-        Status = SkuStatus.Inactive;
-        _domainEvents.Add(new SkuBlockedDomainEvent(Id, ProductId));
+        TransitionTo(SkuStatus.Inactive, () => new SkuBlockedDomainEvent(Id, ProductId));
     }
 
     /// <summary>
-    /// Transitions the Sku to Archived ("discontinued").
+    /// Transitions the Sku to Archived ("discontinued"), enforcing the
+    /// lifecycle state machine (docs/adr/0012). This is a terminal
+    /// transition: an Archived Sku cannot be reactivated or blocked again.
     /// </summary>
     public void Discontinue()
     {
-        if (Status == SkuStatus.Archived)
+        TransitionTo(SkuStatus.Archived, () => new SkuDiscontinuedDomainEvent(Id, ProductId));
+    }
+
+    private void TransitionTo(SkuStatus newStatus, Func<IDomainEvent> createEvent)
+    {
+        if (newStatus == Status)
         {
             return;
         }
 
-        Status = SkuStatus.Archived;
-        _domainEvents.Add(new SkuDiscontinuedDomainEvent(Id, ProductId));
+        if (!AllowedTransitions[Status].Contains(newStatus))
+        {
+            throw new InvalidSkuStatusTransitionException(
+                $"Cannot transition Sku status from {Status} to {newStatus}.");
+        }
+
+        Status = newStatus;
+        _domainEvents.Add(createEvent());
     }
 
     public void ClearDomainEvents()
