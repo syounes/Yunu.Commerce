@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 using Yunu.Commerce.Catalog.Domain.Brands;
@@ -37,7 +37,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -59,7 +59,7 @@ public class CreateSkuHandlerTests
         var productRepository = new FakeProductRepository();
         var skuRepository = new FakeSkuRepository();
         var attributeCatalogRepository = new FakeAttributeCatalogRepository();
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -87,7 +87,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -122,7 +122,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -153,7 +153,7 @@ public class CreateSkuHandlerTests
         {
             AttributeDefinitionId = 47,
             Code = "gender",
-            Name = "Gênero",
+            Name = "G�nero",
             DataType = "Enum",
             Cardinality = "Single",
             IsVariantAxis = false,
@@ -173,7 +173,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -200,7 +200,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -238,7 +238,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {
@@ -278,7 +278,7 @@ public class CreateSkuHandlerTests
 
         var product = CreateAndPersistProduct(productRepository);
 
-        var handler = new CreateSkuHandler(productRepository, skuRepository, attributeCatalogRepository);
+        var handler = new CreateSkuHandler(productRepository, attributeCatalogRepository, new FakeProductSkuConcurrencyCoordinator(productRepository, skuRepository));
 
         var command = new CreateSkuCommand
         {

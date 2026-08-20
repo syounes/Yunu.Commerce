@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Domain.Attributes;
+using Yunu.Commerce.Catalog.Domain.Concurrency;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
 
@@ -15,6 +16,17 @@ namespace Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 /// This is an Application-level cross-Aggregate validation, not a Domain invariant
 /// (the Sku Aggregate itself does not enforce Product existence).
 ///
+/// The final persistence step goes through
+/// <see cref="IProductSkuConcurrencyCoordinator"/> rather than a plain
+/// <see cref="ISkuRepository.AddAsync"/> call
+/// (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md,
+/// "V11" cross-aggregate concurrency): a concurrent ArchiveProduct racing
+/// against this creation could otherwise both pass their own guard check
+/// against a state that changes before the other commits (write skew),
+/// leaving an Archived Product with a non-Archived Sku. The coordinator
+/// atomically re-verifies the Product is not Archived and creates the Sku
+/// inside the same MongoDB transaction.
+///
 /// Explicit, structured attribute assignments (docs task: "SKU attribute
 /// foundation") are resolved and validated against SQL Server
 /// (<see cref="IAttributeCatalogRepository"/>) BEFORE Sku.AssignAttribute is
@@ -23,23 +35,22 @@ namespace Yunu.Commerce.Catalog.Application.Skus.CreateSku;
 /// MinNumericValue/MaxNumericValue/MaxLength, and Enum attributes resolve
 /// their AttributeOption by definition + option code. This stage does not
 /// interpret natural-language phrases; the caller must send explicit
-/// attribute codes and values. The complete Sku Aggregate (including its
-/// attributes) is persisted once through ISkuRepository.
+/// attribute codes and values.
 /// </summary>
 public sealed class CreateSkuHandler
 {
     private readonly IProductRepository _productRepository;
-    private readonly ISkuRepository _skuRepository;
     private readonly IAttributeCatalogRepository _attributeCatalogRepository;
+    private readonly IProductSkuConcurrencyCoordinator _concurrencyCoordinator;
 
     public CreateSkuHandler(
         IProductRepository productRepository,
-        ISkuRepository skuRepository,
-        IAttributeCatalogRepository attributeCatalogRepository)
+        IAttributeCatalogRepository attributeCatalogRepository,
+        IProductSkuConcurrencyCoordinator concurrencyCoordinator)
     {
         _productRepository = productRepository;
-        _skuRepository = skuRepository;
         _attributeCatalogRepository = attributeCatalogRepository;
+        _concurrencyCoordinator = concurrencyCoordinator;
     }
 
     public async Task<CreateSkuResult> HandleAsync(CreateSkuCommand command, CancellationToken cancellationToken)
@@ -67,7 +78,19 @@ public sealed class CreateSkuHandler
             await AssignAttributeAsync(sku, attributeInput, cancellationToken);
         }
 
-        await _skuRepository.AddAsync(sku, cancellationToken);
+        var result = await _concurrencyCoordinator.CreateSkuIfProductNotArchivedAsync(sku, cancellationToken);
+
+        switch (result)
+        {
+            case CreateSkuCoordinationResult.Created:
+                break;
+            case CreateSkuCoordinationResult.ProductNotFound:
+                throw new InvalidOperationException($"Product with ID '{command.ProductId}' does not exist. Cannot create Sku for non-existent Product.");
+            case CreateSkuCoordinationResult.ProductArchived:
+                throw new InvalidOperationException($"Product with ID '{command.ProductId}' is Archived. Cannot create a Sku under an Archived Product.");
+            default:
+                throw new ArgumentOutOfRangeException(nameof(result), result, "Unsupported CreateSku coordination result.");
+        }
 
         return new CreateSkuResult
         {

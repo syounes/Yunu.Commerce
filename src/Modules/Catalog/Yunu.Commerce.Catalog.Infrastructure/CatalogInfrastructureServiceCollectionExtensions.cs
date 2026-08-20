@@ -62,6 +62,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<IProductRepository, MongoProductRepository>();
         services.AddSingleton<ISkuRepository, MongoSkuRepository>();
         services.AddSingleton<IProductProposalRepository, MongoProductProposalRepository>();
+        services.AddSingleton<Yunu.Commerce.Catalog.Domain.Concurrency.IProductSkuConcurrencyCoordinator, MongoProductSkuConcurrencyCoordinator>();
 
         services.Configure<GoogleTaxonomyOptions>(configuration.GetSection("Catalog:GoogleTaxonomy"));
         services.Configure<GoogleTaxonomySqlOptions>(configuration.GetSection("Catalog:GoogleTaxonomySql"));

@@ -1,67 +1,90 @@
-﻿using Yunu.Commerce.Catalog.Domain.Products;
-using Yunu.Commerce.Catalog.Domain.Skus;
+﻿using Yunu.Commerce.Catalog.Domain.Concurrency;
+using Yunu.Commerce.Catalog.Domain.Products;
 
 namespace Yunu.Commerce.Catalog.Application.Products.TransitionProductStatus;
 
 /// <summary>
 /// Orchestrates an explicit lifecycle Status transition for an existing
 /// Product (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md).
-/// The state machine itself is enforced by <see cref="Product.TransitionTo"/>;
-/// this handler only adds the cross-aggregate Archive guard (no non-Archived
-/// Sku may exist) and persists the change with an optimistic-concurrency retry
-/// loop against <see cref="IProductRepository.UpdateStatusAsync"/>.
+/// The state machine itself is enforced by <see cref="Product.TransitionTo"/>.
+///
+/// This handler operates strictly on the state view it loaded for this
+/// attempt: if the conditional persistence write does not match (another
+/// writer already changed the Product concurrently), it does NOT reload the
+/// Aggregate and reinterpret the original command against the new state; it
+/// throws <see cref="ProductStatusConcurrencyConflictException"/> instead
+/// (first-writer-wins), translated by the HTTP layer to 409 Conflict.
+///
+/// Archiving a Product races with Sku creation/(re)activation for the
+/// cross-aggregate invariant "Product Archived ⇒ no non-Archived Sku"
+/// (docs task: "V11 - Product/Sku Lifecycle Concurrency"); that specific
+/// transition is delegated to <see cref="IProductSkuConcurrencyCoordinator"/>,
+/// which atomically re-checks for a non-Archived Sku and commits the Archive
+/// inside a single MongoDB transaction. Non-Archive transitions have no
+/// cross-aggregate concern and are persisted directly through
+/// <see cref="IProductRepository.UpdateStatusAsync"/>.
 /// </summary>
 public sealed class TransitionProductStatusHandler
 {
-    private const int MaxRetries = 3;
-
     private readonly IProductRepository _productRepository;
-    private readonly ISkuRepository _skuRepository;
+    private readonly IProductSkuConcurrencyCoordinator _concurrencyCoordinator;
 
-    public TransitionProductStatusHandler(IProductRepository productRepository, ISkuRepository skuRepository)
+    public TransitionProductStatusHandler(
+        IProductRepository productRepository,
+        IProductSkuConcurrencyCoordinator concurrencyCoordinator)
     {
         _productRepository = productRepository;
-        _skuRepository = skuRepository;
+        _concurrencyCoordinator = concurrencyCoordinator;
     }
 
     public async Task HandleAsync(TransitionProductStatusCommand command, CancellationToken cancellationToken)
     {
         var newStatus = ParseEnum<ProductStatus>(command.Status, nameof(command.Status));
 
-        for (var attempt = 0; attempt < MaxRetries; attempt++)
+        var product = await _productRepository.GetByIdAsync(new ProductId(command.ProductId), cancellationToken);
+        if (product is null)
         {
-            var product = await _productRepository.GetByIdAsync(new ProductId(command.ProductId), cancellationToken);
-            if (product is null)
-            {
-                throw new KeyNotFoundException($"Product '{command.ProductId}' not found.");
-            }
+            throw new KeyNotFoundException($"Product '{command.ProductId}' not found.");
+        }
 
-            if (newStatus == ProductStatus.Archived && product.Status != ProductStatus.Archived)
+        var expectedCurrentStatus = product.Status;
+
+        // Validates the transition itself (throws InvalidProductStatusTransitionException
+        // for an illegal transition) against the state loaded for this attempt only.
+        product.TransitionTo(newStatus);
+
+        if (newStatus == ProductStatus.Archived)
+        {
+            var result = await _concurrencyCoordinator.ArchiveProductAsync(product.Id, expectedCurrentStatus, cancellationToken);
+
+            switch (result)
             {
-                if (await _skuRepository.ExistsNonArchivedByProductIdAsync(product.Id, cancellationToken))
-                {
+                case ArchiveProductCoordinationResult.Archived:
+                    return;
+                case ArchiveProductCoordinationResult.ProductNotFound:
+                    throw new KeyNotFoundException($"Product '{command.ProductId}' not found.");
+                case ArchiveProductCoordinationResult.NonArchivedSkuExists:
                     throw new ProductHasNonArchivedSkusException(
                         $"Product '{command.ProductId}' has at least one non-Archived Sku and cannot be archived.");
-                }
-            }
-
-            var expectedCurrentStatus = product.Status;
-            product.TransitionTo(newStatus);
-
-            var updated = await _productRepository.UpdateStatusAsync(
-                product.Id,
-                expectedCurrentStatus,
-                newStatus,
-                cancellationToken);
-
-            if (updated)
-            {
-                return;
+                case ArchiveProductCoordinationResult.ConcurrencyConflict:
+                    throw new ProductStatusConcurrencyConflictException(
+                        $"Product '{command.ProductId}' was concurrently modified by another writer. Reload the current state and retry explicitly.");
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(result), result, "Unsupported ArchiveProduct coordination result.");
             }
         }
 
-        throw new InvalidOperationException(
-            $"Could not transition Product '{command.ProductId}' status due to a concurrent update. Please retry.");
+        var updated = await _productRepository.UpdateStatusAsync(
+            product.Id,
+            expectedCurrentStatus,
+            newStatus,
+            cancellationToken);
+
+        if (!updated)
+        {
+            throw new ProductStatusConcurrencyConflictException(
+                $"Product '{command.ProductId}' was concurrently modified by another writer. Reload the current state and retry explicitly.");
+        }
     }
 
     private static TEnum ParseEnum<TEnum>(string value, string paramName) where TEnum : struct, Enum

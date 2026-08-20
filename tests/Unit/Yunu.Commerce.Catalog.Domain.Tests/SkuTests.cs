@@ -75,6 +75,7 @@ public class SkuTests
     public void Block_Should_Transition_Status_And_Raise_Event()
     {
         var sku = CreateSku();
+        sku.Activate();
         sku.ClearDomainEvents();
 
         sku.Block();

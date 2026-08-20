@@ -32,21 +32,23 @@ public sealed class InvalidSkuStatusTransitionException : Exception
 /// assign an attribute; Sku only enforces the invariants that do not depend
 /// on external reference data (docs task, "Architectural boundaries" §6).
 ///
-/// Lifecycle (docs/adr/0012): Draft -&gt; Active/Inactive/Archived;
+/// Lifecycle (docs/adr/0012): Draft -&gt; Active/Archived;
 /// Active -&gt; Inactive/Archived; Inactive -&gt; Active/Archived; Archived is
-/// terminal. This Aggregate only enforces the state machine itself; the
-/// cross-aggregate guard preventing a Sku from leaving Archived while its
-/// Product is Archived, and preventing a Sku from being (re)activated while
-/// its Product is Archived, is enforced by Catalog.Application before these
-/// methods are called. Sku status is never propagated to/from Product: each
-/// Aggregate's lifecycle is fully independent (docs/adr/0010 preserved
-/// unchanged).
+/// terminal (no transition ever leaves Archived). A Draft Sku has never been
+/// operational, so it is never "deactivated" (Draft -&gt; Inactive does not
+/// exist); only a previously Active Sku can become Inactive. This Aggregate
+/// only enforces the state machine itself; the cross-aggregate guard
+/// preventing a Sku from being (re)activated/blocked while its Product is
+/// Archived is enforced by Catalog.Application (and, for the concurrent
+/// case, by the Mongo cross-aggregate coordinator) before these methods are
+/// called. Sku status is never propagated to/from Product: each Aggregate's
+/// lifecycle is fully independent (docs/adr/0010 preserved unchanged).
 /// </summary>
 public sealed class Sku
 {
     private static readonly Dictionary<SkuStatus, HashSet<SkuStatus>> AllowedTransitions = new()
     {
-        [SkuStatus.Draft] = new HashSet<SkuStatus> { SkuStatus.Active, SkuStatus.Inactive, SkuStatus.Archived },
+        [SkuStatus.Draft] = new HashSet<SkuStatus> { SkuStatus.Active, SkuStatus.Archived },
         [SkuStatus.Active] = new HashSet<SkuStatus> { SkuStatus.Inactive, SkuStatus.Archived },
         [SkuStatus.Inactive] = new HashSet<SkuStatus> { SkuStatus.Active, SkuStatus.Archived },
         [SkuStatus.Archived] = new HashSet<SkuStatus>()
@@ -150,7 +152,8 @@ public sealed class Sku
     /// <summary>
     /// Transitions the Sku to Archived ("discontinued"), enforcing the
     /// lifecycle state machine (docs/adr/0012). This is a terminal
-    /// transition: an Archived Sku cannot be reactivated or blocked again.
+    /// transition: Archived never leaves Archived, so an Archived Sku can
+    /// never be reactivated or blocked again.
     /// </summary>
     public void Discontinue()
     {

@@ -41,6 +41,22 @@ public sealed class ProductDocument
     public List<SegmentAssignmentDocument> SegmentAssignments { get; set; } = new();
 
     public string Status { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Internal, infrastructure-only concurrency/coordination token
+    /// (docs/adr/0012). Never mapped onto the Domain <c>Product</c>
+    /// Aggregate. Incremented atomically, inside the same MongoDB
+    /// transaction as the write it accompanies, by every operation that
+    /// participates in the cross-aggregate Product/Sku Archive invariant
+    /// (<c>ArchiveProduct</c>, <c>CreateSku</c>, Sku (re)activation/blocking).
+    /// Because these operations all touch this same field on the same
+    /// Product document, MongoDB serializes them: two concurrent
+    /// transactions that both try to mutate it cannot both commit, giving
+    /// "Product Archived ⇒ no non-Archived Sku" a genuine common
+    /// write/coordination point instead of relying on two independent
+    /// document writes.
+    /// </summary>
+    public long LifecycleRevision { get; set; }
 }
 
 /// <summary>

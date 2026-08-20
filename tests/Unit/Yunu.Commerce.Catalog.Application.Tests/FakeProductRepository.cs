@@ -17,14 +17,34 @@ internal sealed class FakeProductRepository : IProductRepository
     public Task AddAsync(Product product, CancellationToken cancellationToken)
     {
         AddAsyncCallCount++;
-        _products[product.Id.Value] = product;
+        _products[product.Id.Value] = Snapshot(product);
         return Task.CompletedTask;
     }
 
     public Task<Product?> GetByIdAsync(ProductId id, CancellationToken cancellationToken)
     {
         _products.TryGetValue(id.Value, out var product);
-        return Task.FromResult(product);
+        return Task.FromResult(product is null ? null : Snapshot(product));
+    }
+
+    /// <summary>
+    /// Returns an independent copy of the given Product, matching real
+    /// persistence semantics (each GetByIdAsync/AddAsync call yields a
+    /// distinct Aggregate instance, never a shared in-memory reference).
+    /// This is required for tests to accurately observe concurrency
+    /// conflicts: mutating one loaded instance must never be visible through
+    /// another instance loaded before the persisted write actually happened.
+    /// </summary>
+    private static Product Snapshot(Product product)
+    {
+        return Product.Hydrate(
+            product.Id,
+            product.Name,
+            product.Description,
+            product.BrandId,
+            product.CanonicalTaxonomyNodeId,
+            product.Status,
+            product.SegmentAssignments);
     }
 
     public Task<bool> ExistsByCanonicalTaxonomyNodeIdAsync(CanonicalTaxonomyNodeId canonicalTaxonomyNodeId, CancellationToken cancellationToken)

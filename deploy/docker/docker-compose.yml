@@ -5,6 +5,12 @@ services:
     image: mongo:7.0.14
     container_name: yunu-commerce-mongo
     restart: unless-stopped
+    # Single-node replica set (docs/adr/0012): required for MongoDB
+    # multi-document transactions, which the Catalog module uses to
+    # atomically coordinate the cross-aggregate Product/Sku Archive
+    # invariant (ArchiveProduct vs CreateSku/ReactivateSku). A standalone
+    # (non-replica-set) mongod does NOT support transactions.
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
@@ -12,10 +18,17 @@ services:
     networks:
       - yunu-network
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      # Idempotently initiates the single-node replica set on first startup,
+      # then reports healthy only once the replica set actually has a
+      # PRIMARY (required before transactions can be used).
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) }\" && mongosh --quiet --eval \"rs.status().myState\" | grep -q 1"
+        ]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 15
       start_period: 20s
 
   sqlserver:

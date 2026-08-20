@@ -16,14 +16,31 @@ internal sealed class FakeSkuRepository : ISkuRepository
     public Task AddAsync(Sku sku, CancellationToken cancellationToken)
     {
         AddAsyncCallCount++;
-        _skus[sku.Id.Value] = sku;
+        _skus[sku.Id.Value] = Snapshot(sku);
         return Task.CompletedTask;
     }
 
     public Task<Sku?> GetByIdAsync(SkuId id, CancellationToken cancellationToken)
     {
         _skus.TryGetValue(id.Value, out var sku);
-        return Task.FromResult(sku);
+        return Task.FromResult(sku is null ? null : Snapshot(sku));
+    }
+
+    /// <summary>
+    /// Returns an independent copy of the given Sku, matching real
+    /// persistence semantics (each GetByIdAsync/AddAsync call yields a
+    /// distinct Aggregate instance, never a shared in-memory reference).
+    /// </summary>
+    private static Sku Snapshot(Sku sku)
+    {
+        return Sku.Hydrate(
+            sku.Id,
+            sku.ProductId,
+            sku.Code,
+            sku.Gtin,
+            sku.Status,
+            sku.Attributes,
+            sku.SegmentAssignments);
     }
 
     public Task<IReadOnlyCollection<Sku>> GetByProductIdAsync(ProductId productId, CancellationToken cancellationToken)
