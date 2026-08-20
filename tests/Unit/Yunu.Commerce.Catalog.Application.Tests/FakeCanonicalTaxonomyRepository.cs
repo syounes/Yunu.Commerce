@@ -28,12 +28,6 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
         return Task.CompletedTask;
     }
 
-    public Task DeleteAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)
-    {
-        _nodes.Remove(id.Value);
-        return Task.CompletedTask;
-    }
-
     public Task<CanonicalTaxonomyNode?> GetByIdAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)
     {
         _nodes.TryGetValue(id.Value, out var node);
@@ -67,6 +61,17 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
     {
         _nodes[id] = node;
         RegisterParentRelationship(id, node);
+    }
+
+    /// <summary>
+    /// Test-only helper to simulate an inconsistent tree by removing a node
+    /// while descendants still reference it as ParentId. There is no
+    /// production DeleteAsync (docs task: "Yunu.Commerce V9 - Canonical
+    /// Taxonomy Lifecycle + Usage Guards").
+    /// </summary>
+    public void RemoveForTest(CanonicalTaxonomyNodeId id)
+    {
+        _nodes.Remove(id.Value);
     }
 
     private void RegisterParentRelationship(long id, CanonicalTaxonomyNode node)

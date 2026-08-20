@@ -4,6 +4,19 @@ using Yunu.Commerce.SharedKernel;
 namespace Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 
 /// <summary>
+/// Thrown when an invalid Status transition is attempted on a
+/// <see cref="CanonicalTaxonomyNode"/> (docs task: "Yunu.Commerce V9 -
+/// Canonical Taxonomy Lifecycle + Usage Guards"), mirroring
+/// <see cref="Yunu.Commerce.Catalog.Domain.Segments.InvalidSegmentDefinitionStatusTransitionException"/>.
+/// </summary>
+public sealed class InvalidCanonicalTaxonomyNodeStatusTransitionException : Exception
+{
+    public InvalidCanonicalTaxonomyNodeStatusTransitionException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
 /// Canonical Taxonomy Node Aggregate Root (docs task: "Canonical Taxonomy +
 /// Segments Domain" §5-§6). Represents a single node of the Yunu canonical
 /// classification tree, backed by SQL Server (Catalog.CanonicalTaxonomyNodes,
@@ -23,9 +36,29 @@ namespace Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 /// association between a node and its Segment Definitions is a many-to-many
 /// relationship owned by Catalog.CanonicalTaxonomyNodeSegmentDefinitions and
 /// is not modeled here.
+///
+/// Lifecycle (docs task: "Yunu.Commerce V9 - Canonical Taxonomy Lifecycle +
+/// Usage Guards"): Status transitions follow the same shape as
+/// <see cref="Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinition"/> and
+/// <see cref="Yunu.Commerce.Catalog.Domain.Segments.SegmentOption"/>:
+/// Draft -&gt; Active/Archived; Active -&gt; Inactive/Archived;
+/// Inactive -&gt; Active/Archived; Archived is terminal. This Aggregate only
+/// enforces the state machine itself; it has no visibility into children,
+/// Products or Segment associations, so usage guards (blocking Archive while
+/// still structurally in use) are enforced by Catalog.Application before
+/// <see cref="TransitionTo"/> is called (see
+/// UpdateCanonicalTaxonomyNodeStatusHandler).
 /// </summary>
 public sealed class CanonicalTaxonomyNode
 {
+    private static readonly Dictionary<CanonicalTaxonomyNodeStatus, HashSet<CanonicalTaxonomyNodeStatus>> AllowedTransitions = new()
+    {
+        [CanonicalTaxonomyNodeStatus.Draft] = new HashSet<CanonicalTaxonomyNodeStatus> { CanonicalTaxonomyNodeStatus.Active, CanonicalTaxonomyNodeStatus.Archived },
+        [CanonicalTaxonomyNodeStatus.Active] = new HashSet<CanonicalTaxonomyNodeStatus> { CanonicalTaxonomyNodeStatus.Inactive, CanonicalTaxonomyNodeStatus.Archived },
+        [CanonicalTaxonomyNodeStatus.Inactive] = new HashSet<CanonicalTaxonomyNodeStatus> { CanonicalTaxonomyNodeStatus.Active, CanonicalTaxonomyNodeStatus.Archived },
+        [CanonicalTaxonomyNodeStatus.Archived] = new HashSet<CanonicalTaxonomyNodeStatus>()
+    };
+
     private readonly List<IDomainEvent> _domainEvents = new();
 
     public CanonicalTaxonomyNodeId Id { get; }
@@ -197,6 +230,33 @@ public sealed class CanonicalTaxonomyNode
         NormalizedName = normalizedName.Trim();
         Description = description;
         Path = path.Trim();
+
+        _domainEvents.Add(new Events.CanonicalTaxonomyNodeUpdatedDomainEvent(Id));
+    }
+
+    /// <summary>
+    /// Transitions this node's lifecycle Status (docs task: "Yunu.Commerce
+    /// V9 - Canonical Taxonomy Lifecycle + Usage Guards"). Only the state
+    /// machine itself is enforced here: Draft -&gt; Active/Archived,
+    /// Active -&gt; Inactive/Archived, Inactive -&gt; Active/Archived, Archived
+    /// is terminal. Usage guards (children/Products/Segment associations)
+    /// are the Application layer's responsibility and must be checked
+    /// before calling this method for an Archive transition.
+    /// </summary>
+    public void TransitionTo(CanonicalTaxonomyNodeStatus newStatus)
+    {
+        if (newStatus == Status)
+        {
+            return;
+        }
+
+        if (!AllowedTransitions[Status].Contains(newStatus))
+        {
+            throw new InvalidCanonicalTaxonomyNodeStatusTransitionException(
+                $"Cannot transition CanonicalTaxonomyNode status from {Status} to {newStatus}.");
+        }
+
+        Status = newStatus;
 
         _domainEvents.Add(new Events.CanonicalTaxonomyNodeUpdatedDomainEvent(Id));
     }

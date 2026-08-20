@@ -1,4 +1,4 @@
-/*
+﻿/*
     Yunu.Commerce - Canonical Taxonomy starter model and data reset
     Target: SQL Server 2022+
 
@@ -214,10 +214,13 @@ BEGIN TRY
                 PRIMARY KEY CLUSTERED
                 (CanonicalTaxonomyNodeId, SegmentDefinitionId),
 
+            -- Intentionally no ON DELETE CASCADE (docs task: "Yunu.Commerce
+            -- V9 - Canonical Taxonomy Lifecycle + Usage Guards"): Canonical
+            -- Taxonomy nodes are never hard-deleted, so no cascade delete
+            -- path should exist at the structural (FK) level either.
             CONSTRAINT FK_CanonicalNodeSegments_Node
                 FOREIGN KEY (CanonicalTaxonomyNodeId)
-                REFERENCES Catalog.CanonicalTaxonomyNodes (CanonicalTaxonomyNodeId)
-                ON DELETE CASCADE,
+                REFERENCES Catalog.CanonicalTaxonomyNodes (CanonicalTaxonomyNodeId),
 
             CONSTRAINT FK_CanonicalNodeSegments_Definition
                 FOREIGN KEY (SegmentDefinitionId)

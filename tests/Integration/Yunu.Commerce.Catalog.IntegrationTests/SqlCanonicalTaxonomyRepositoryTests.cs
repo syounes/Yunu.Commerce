@@ -206,16 +206,19 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DeleteAsync_Should_Remove_Node()
+    public async Task UpdateAsync_Should_Persist_Status_Transition()
     {
-        var node = CreateRootNode("delete-target");
+        var node = CreateRootNode("archive-target");
         var id = await _repository.AddAsync(node, CancellationToken.None);
 
-        await _repository.DeleteAsync(id, CancellationToken.None);
+        var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
+        persisted!.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
+
+        await _repository.UpdateAsync(persisted, CancellationToken.None);
 
         var reloaded = await _repository.GetByIdAsync(id, CancellationToken.None);
 
-        Assert.Null(reloaded);
+        Assert.Equal(CanonicalTaxonomyNodeStatus.Archived, reloaded!.Status);
     }
 
     [Fact]

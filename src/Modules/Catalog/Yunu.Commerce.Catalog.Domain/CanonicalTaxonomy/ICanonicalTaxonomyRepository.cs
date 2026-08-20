@@ -8,6 +8,12 @@
 /// which remains the source of truth. Catalog.Domain never queries SQL
 /// Server directly; Infrastructure implements this port with plain ADO.NET,
 /// mirroring the existing GoogleTaxonomy/AttributeCatalog SQL Server adapters.
+///
+/// Intentionally exposes no hard-delete operation (docs task: "Yunu.Commerce
+/// V9 - Canonical Taxonomy Lifecycle + Usage Guards"): Canonical Taxonomy is
+/// historical, structural catalog data, and its normal lifecycle retirement
+/// path is <see cref="CanonicalTaxonomyNodeStatus.Archived"/> via
+/// <see cref="UpdateAsync"/>, not physical row deletion.
 /// </summary>
 public interface ICanonicalTaxonomyRepository
 {
@@ -20,8 +26,6 @@ public interface ICanonicalTaxonomyRepository
     Task<CanonicalTaxonomyNodeId> AddAsync(CanonicalTaxonomyNode node, CancellationToken cancellationToken);
 
     Task UpdateAsync(CanonicalTaxonomyNode node, CancellationToken cancellationToken);
-
-    Task DeleteAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken);
 
     Task<CanonicalTaxonomyNode?> GetByIdAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken);
 

@@ -18,7 +18,7 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
             status: CanonicalTaxonomyNodeStatus.Active);
         var rootId = await repo.AddAsync(root, CancellationToken.None);
 
-        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo);
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
         {
             CanonicalTaxonomyNodeId = rootId.Value,
@@ -55,7 +55,7 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
             null, 2, "Catálogo > Vestuário e acessórios > Sapatos", status: CanonicalTaxonomyNodeStatus.Active);
         var sapatosId = await repo.AddAsync(sapatos, CancellationToken.None);
 
-        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo);
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
         {
             CanonicalTaxonomyNodeId = sapatosId.Value,
@@ -93,7 +93,7 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
             null, 1, "Catálogo > Child", status: CanonicalTaxonomyNodeStatus.Active);
         await repo.AddAsync(child, CancellationToken.None);
 
-        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo);
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
         {
             CanonicalTaxonomyNodeId = rootId.Value,
@@ -116,7 +116,7 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var rootId = await repo.AddAsync(root, CancellationToken.None);
         productRepo.MarkCanonicalTaxonomyNodeInUse(rootId);
 
-        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo);
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
         {
             CanonicalTaxonomyNodeId = rootId.Value,
@@ -144,9 +144,9 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var childId = await repo.AddAsync(child, CancellationToken.None);
 
         // Simulate an inconsistent tree: remove the parent while the child still references it.
-        await repo.DeleteAsync(rootId, CancellationToken.None);
+        repo.RemoveForTest(rootId);
 
-        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo);
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
         {
             CanonicalTaxonomyNodeId = childId.Value,

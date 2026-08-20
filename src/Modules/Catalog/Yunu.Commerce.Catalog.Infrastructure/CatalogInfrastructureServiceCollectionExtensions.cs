@@ -103,6 +103,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<ICanonicalTaxonomyRepository, SqlCanonicalTaxonomyRepository>();
         services.AddSingleton<ICanonicalTaxonomySegmentAssociationReader, SqlCanonicalTaxonomySegmentAssociationReader>();
+        services.AddSingleton<Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.ICanonicalTaxonomyNodeUsageReader, SqlCanonicalTaxonomyNodeUsageReader>();
         services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
         services.AddSingleton<ISegmentDefinitionRepository, SqlSegmentDefinitionRepository>();
         services.AddSingleton<ISegmentOptionRepository, SqlSegmentOptionRepository>();

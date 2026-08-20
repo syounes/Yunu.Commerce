@@ -59,6 +59,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
                 NormalizedName = @NormalizedName,
                 Description = @Description,
                 Path = @Path,
+                Status = @Status,
                 UpdatedAt = @UpdatedAt
             WHERE CanonicalTaxonomyNodeId = @CanonicalTaxonomyNodeId
             """;
@@ -71,24 +72,9 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         command.Parameters.AddWithValue("@NormalizedName", node.NormalizedName);
         command.Parameters.AddWithValue("@Description", (object?)node.Description ?? DBNull.Value);
         command.Parameters.AddWithValue("@Path", node.Path);
+        command.Parameters.AddWithValue("@Status", node.Status.ToString());
         command.Parameters.AddWithValue("@UpdatedAt", DateTime.UtcNow);
         command.Parameters.AddWithValue("@CanonicalTaxonomyNodeId", node.Id.Value);
-
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)
-    {
-        const string sql = """
-            DELETE FROM Catalog.CanonicalTaxonomyNodes
-            WHERE CanonicalTaxonomyNodeId = @CanonicalTaxonomyNodeId
-            """;
-
-        await using var connection = new SqlConnection(_connectionString);
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = new SqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@CanonicalTaxonomyNodeId", id.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

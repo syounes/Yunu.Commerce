@@ -16,5 +16,9 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="CanonicalTaxonomy\DeleteCanonicalTaxonomyNode\" />
+  </ItemGroup>
+
 </Project>
 

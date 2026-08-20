@@ -13,6 +13,15 @@ namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTax
 /// as authority. Association between a node and Segment Definitions is
 /// handled separately through Catalog.CanonicalTaxonomyNodeSegmentDefinitions
 /// and is out of scope for this handler.
+///
+/// Parent lifecycle policy (docs task: "Yunu.Commerce V9 - Canonical
+/// Taxonomy Lifecycle + Usage Guards"): a new child cannot be created under
+/// an Archived parent, since Archived represents definitive structural
+/// retirement. Draft/Active/Inactive parents are all allowed to receive new
+/// children: the project does not define a stricter policy for Draft/
+/// Inactive, and blocking only Archived is the smallest rule that prevents
+/// an evident inconsistency (mirrors
+/// Yunu.Commerce.Catalog.Application.SegmentOptions.CreateSegmentOption.CreateSegmentOptionHandler).
 /// </summary>
 public sealed class CreateCanonicalTaxonomyNodeHandler
 {
@@ -51,6 +60,12 @@ public sealed class CreateCanonicalTaxonomyNodeHandler
             if (parent is null)
             {
                 throw new ArgumentException($"Parent node '{parentIdValue}' does not exist.", nameof(command));
+            }
+
+            if (parent.Status == Domain.CanonicalTaxonomy.CanonicalTaxonomyNodeStatus.Archived)
+            {
+                throw new CanonicalTaxonomyNodeParentArchivedException(
+                    $"Parent Canonical Taxonomy node '{parentIdValue}' is Archived and cannot receive new children.");
             }
 
             var depth = parent.Depth + 1;
