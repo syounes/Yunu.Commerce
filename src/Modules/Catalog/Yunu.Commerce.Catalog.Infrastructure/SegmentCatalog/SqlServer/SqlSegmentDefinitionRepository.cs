@@ -41,7 +41,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
                 SemanticText,
                 SelectionMode,
                 AssignmentScope,
-                IsRequired,
                 Status
             )
             OUTPUT INSERTED.SegmentDefinitionId
@@ -54,7 +53,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
                 @SemanticText,
                 @SelectionMode,
                 @AssignmentScope,
-                @IsRequired,
                 @Status
             );
             """;
@@ -70,7 +68,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
         command.Parameters.AddWithValue("@SemanticText", (object?)definition.SemanticText ?? DBNull.Value);
         command.Parameters.AddWithValue("@SelectionMode", definition.SelectionMode.ToString());
         command.Parameters.AddWithValue("@AssignmentScope", definition.AssignmentScope.ToString());
-        command.Parameters.AddWithValue("@IsRequired", definition.IsRequired);
         command.Parameters.AddWithValue("@Status", definition.Status.ToString());
 
         var generatedId = (long)(await command.ExecuteScalarAsync(cancellationToken))!;
@@ -98,7 +95,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
                 SemanticText = @SemanticText,
                 SelectionMode = @SelectionMode,
                 AssignmentScope = @AssignmentScope,
-                IsRequired = @IsRequired,
                 Status = @Status,
                 UpdatedAt = SYSUTCDATETIME()
             WHERE SegmentDefinitionId = @SegmentDefinitionId
@@ -114,7 +110,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
         command.Parameters.AddWithValue("@SemanticText", (object?)definition.SemanticText ?? DBNull.Value);
         command.Parameters.AddWithValue("@SelectionMode", definition.SelectionMode.ToString());
         command.Parameters.AddWithValue("@AssignmentScope", definition.AssignmentScope.ToString());
-        command.Parameters.AddWithValue("@IsRequired", definition.IsRequired);
         command.Parameters.AddWithValue("@Status", definition.Status.ToString());
         command.Parameters.AddWithValue("@SegmentDefinitionId", id.Value);
 
@@ -128,7 +123,7 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
     public async Task<SegmentDefinition?> GetByIdAsync(SegmentDefinitionId id, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             WHERE SegmentDefinitionId = @SegmentDefinitionId
             """;
@@ -148,7 +143,7 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
     public async Task<SegmentDefinition?> GetByCodeAsync(SegmentDefinitionCode code, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             WHERE Code = @Code
             """;
@@ -168,7 +163,7 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
     public async Task<SegmentDefinition?> FindByNormalizedNameAsync(string normalizedName, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, NormalizedName, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             WHERE NormalizedName = @NormalizedName
             """;
@@ -211,8 +206,7 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
         var semanticText = reader.IsDBNull(5) ? null : reader.GetString(5);
         var selectionMode = Enum.Parse<SegmentSelectionMode>(reader.GetString(6), ignoreCase: true);
         var assignmentScope = Enum.Parse<SegmentAssignmentScope>(reader.GetString(7), ignoreCase: true);
-        var isRequired = reader.GetBoolean(8);
-        var status = Enum.Parse<SegmentDefinitionStatus>(reader.GetString(9), ignoreCase: true);
+        var status = Enum.Parse<SegmentDefinitionStatus>(reader.GetString(8), ignoreCase: true);
 
         return SegmentDefinition.Hydrate(
             id,
@@ -223,7 +217,6 @@ public sealed class SqlSegmentDefinitionRepository : ISegmentDefinitionRepositor
             semanticText,
             selectionMode,
             assignmentScope,
-            isRequired,
             status);
     }
 }

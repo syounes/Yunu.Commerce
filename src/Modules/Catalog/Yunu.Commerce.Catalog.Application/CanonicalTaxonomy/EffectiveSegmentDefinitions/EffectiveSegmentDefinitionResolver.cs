@@ -20,18 +20,18 @@
 /// (Suggested/Rejected/Inactive for associations, Draft/Inactive/Archived
 /// for definitions) is excluded before precedence is computed.
 ///
-/// IsRequired audit (docs task mandatory note): SegmentDefinition and
-/// Catalog.CanonicalTaxonomyNodeSegmentDefinitions both persist an
-/// IsRequired flag with overlapping but distinct meaning - the Definition's
-/// IsRequired is a catalog-wide default, while the association's IsRequired
-/// is contextual to a specific node. This resolver surfaces the
-/// association-level IsRequired (contextual to the queried node), because
-/// the same Definition can be optional in one canonical branch and required
-/// in another (e.g. gender optional under "Vestuário e acessórios" but
-/// potentially required under a more specific descendant). This is a
-/// pre-existing modeling redundancy that is preserved as-is in this step;
-/// see the final report for a recommendation to address it in a future,
-/// out-of-scope step.
+/// IsRequired semantics (docs task: "Consolidar a semântica de IsRequired em
+/// Segments"): obligatoriness of a Segment Definition is exclusively
+/// contextual to where it is associated in the Canonical Taxonomy.
+/// Catalog.SegmentDefinitions no longer persists an IsRequired column at
+/// all; Catalog.CanonicalTaxonomyNodeSegmentDefinitions.IsRequired is the
+/// single source of truth. This resolver surfaces the winning association's
+/// IsRequired value, because the same Definition can be optional in one
+/// canonical branch and required in another (e.g. gender optional under
+/// "Vestuário e acessórios" but potentially required under a more specific
+/// descendant). Precedence is applied uniformly: the winning association
+/// (by specificity) determines IsRequired together with every other
+/// association-level field.
 /// </summary>
 public static class EffectiveSegmentDefinitionResolver
 {

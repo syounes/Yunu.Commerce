@@ -31,8 +31,7 @@ public sealed class CreateSegmentDefinitionHandler
             command.Description,
             command.SemanticText,
             selectionMode,
-            assignmentScope,
-            command.IsRequired);
+            assignmentScope);
 
         if (await _repository.FindByNormalizedNameAsync(definition.NormalizedName, cancellationToken) is not null)
         {

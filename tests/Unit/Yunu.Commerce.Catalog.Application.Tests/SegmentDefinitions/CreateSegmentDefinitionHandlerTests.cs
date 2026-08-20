@@ -13,8 +13,7 @@ public class CreateSegmentDefinitionHandlerTests
         Description = null,
         SemanticText = null,
         SelectionMode = "Single",
-        AssignmentScope = "Product",
-        IsRequired = false
+        AssignmentScope = "Product"
     };
 
     [Fact]
@@ -66,8 +65,7 @@ public class CreateSegmentDefinitionHandlerTests
             Description = command.Description,
             SemanticText = command.SemanticText,
             SelectionMode = "NotAMode",
-            AssignmentScope = command.AssignmentScope,
-            IsRequired = command.IsRequired
+            AssignmentScope = command.AssignmentScope
         };
 
         await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(invalidCommand, CancellationToken.None));
@@ -87,8 +85,7 @@ public class CreateSegmentDefinitionHandlerTests
             Description = command.Description,
             SemanticText = command.SemanticText,
             SelectionMode = command.SelectionMode,
-            AssignmentScope = "NotAScope",
-            IsRequired = command.IsRequired
+            AssignmentScope = "NotAScope"
         };
 
         await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(invalidCommand, CancellationToken.None));

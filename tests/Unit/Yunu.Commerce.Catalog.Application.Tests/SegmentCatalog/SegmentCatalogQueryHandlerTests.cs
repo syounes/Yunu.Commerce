@@ -18,7 +18,6 @@ public class SegmentCatalogQueryHandlerTests
         Name = code,
         SelectionMode = "Single",
         AssignmentScope = "Product",
-        IsRequired = false,
         Status = "Active"
     };
 

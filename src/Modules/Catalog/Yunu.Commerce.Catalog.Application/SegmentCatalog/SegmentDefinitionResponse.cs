@@ -25,7 +25,5 @@ public sealed class SegmentDefinitionResponse
 
     public required string AssignmentScope { get; init; }
 
-    public required bool IsRequired { get; init; }
-
     public required string Status { get; init; }
 }

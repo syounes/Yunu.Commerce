@@ -17,14 +17,13 @@ public class UpdateSegmentDefinitionHandlerTests
             Description = null,
             SemanticText = null,
             SelectionMode = "Single",
-            AssignmentScope = "Product",
-            IsRequired = false
+            AssignmentScope = "Product"
         }, CancellationToken.None);
 
         return result.SegmentDefinitionId;
     }
 
-    private static UpdateSegmentDefinitionCommand UpdateCommand(long id, string name = "Gender", string status = "Draft", string selectionMode = "Single", string assignmentScope = "Product", bool isRequired = false) => new()
+    private static UpdateSegmentDefinitionCommand UpdateCommand(long id, string name = "Gender", string status = "Draft", string selectionMode = "Single", string assignmentScope = "Product") => new()
     {
         SegmentDefinitionId = id,
         Name = name,
@@ -32,7 +31,6 @@ public class UpdateSegmentDefinitionHandlerTests
         SemanticText = null,
         SelectionMode = selectionMode,
         AssignmentScope = assignmentScope,
-        IsRequired = isRequired,
         Status = status
     };
 

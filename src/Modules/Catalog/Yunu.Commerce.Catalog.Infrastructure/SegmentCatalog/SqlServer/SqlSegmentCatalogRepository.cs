@@ -27,7 +27,7 @@ public sealed class SqlSegmentCatalogRepository : ISegmentCatalogRepository
     public async Task<SegmentDefinitionResponse?> GetDefinitionByCodeAsync(string code, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             WHERE Code = @Code
             """;
@@ -47,7 +47,7 @@ public sealed class SqlSegmentCatalogRepository : ISegmentCatalogRepository
     public async Task<SegmentDefinitionResponse?> GetDefinitionByIdAsync(long segmentDefinitionId, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             WHERE SegmentDefinitionId = @SegmentDefinitionId
             """;
@@ -67,7 +67,7 @@ public sealed class SqlSegmentCatalogRepository : ISegmentCatalogRepository
     public async Task<IReadOnlyCollection<SegmentDefinitionResponse>> GetDefinitionsAsync(CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, IsRequired, Status
+            SELECT SegmentDefinitionId, Code, Name, Description, SemanticText, SelectionMode, AssignmentScope, Status
             FROM Catalog.SegmentDefinitions
             ORDER BY Name, Code, SegmentDefinitionId
             """;
@@ -170,8 +170,7 @@ public sealed class SqlSegmentCatalogRepository : ISegmentCatalogRepository
             SemanticText = reader.IsDBNull(4) ? null : reader.GetString(4),
             SelectionMode = reader.GetString(5),
             AssignmentScope = reader.GetString(6),
-            IsRequired = reader.GetBoolean(7),
-            Status = reader.GetString(8)
+            Status = reader.GetString(7)
         };
     }
 

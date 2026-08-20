@@ -18,7 +18,6 @@ public sealed class SegmentSemanticDocumentBuilderTests
         SemanticText = "masculino feminino unissex",
         SelectionMode = "Single",
         AssignmentScope = "ProductWithSkuOverride",
-        IsRequired = true,
         UpdatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
     };
 
@@ -86,7 +85,6 @@ public sealed class SegmentSemanticDocumentBuilderTests
             SemanticText = null,
             SelectionMode = "Multiple",
             AssignmentScope = "Product",
-            IsRequired = false,
             UpdatedAt = DateTime.UtcNow
         };
 

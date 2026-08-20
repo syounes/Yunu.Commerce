@@ -20,9 +20,8 @@ public sealed record EffectiveSegmentDefinitionResponse
     /// Whether this Segment Definition is effectively required for the
     /// queried node, taken from the winning
     /// Catalog.CanonicalTaxonomyNodeSegmentDefinitions.IsRequired association
-    /// (the association-level flag), not from
-    /// Catalog.SegmentDefinitions.IsRequired (see the audit note in
-    /// EffectiveSegmentDefinitionResolver).
+    /// (the sole source of truth for obligatoriness; docs task: "Consolidar
+    /// a semântica de IsRequired em Segments").
     /// </summary>
     public required bool IsRequired { get; init; }
 

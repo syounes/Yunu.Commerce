@@ -40,7 +40,6 @@ public sealed class UpdateSegmentDefinitionHandler
             command.SemanticText,
             selectionMode,
             assignmentScope,
-            command.IsRequired,
             status);
 
         await _repository.UpdateAsync(definition, cancellationToken);

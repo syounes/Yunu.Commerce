@@ -11,8 +11,7 @@ public class SegmentDefinitionTests
         string? description = null,
         string? semanticText = null,
         SegmentSelectionMode selectionMode = SegmentSelectionMode.Single,
-        SegmentAssignmentScope assignmentScope = SegmentAssignmentScope.Product,
-        bool isRequired = false)
+        SegmentAssignmentScope assignmentScope = SegmentAssignmentScope.Product)
     {
         return SegmentDefinition.Create(
             new SegmentDefinitionCode(code),
@@ -20,8 +19,7 @@ public class SegmentDefinitionTests
             description,
             semanticText,
             selectionMode,
-            assignmentScope,
-            isRequired);
+            assignmentScope);
     }
 
     [Fact]
@@ -137,7 +135,6 @@ public class SegmentDefinitionTests
             "semantic",
             SegmentSelectionMode.Single,
             SegmentAssignmentScope.Product,
-            true,
             SegmentDefinitionStatus.Active);
 
         Assert.Equal(id, definition.Id);
@@ -148,7 +145,6 @@ public class SegmentDefinitionTests
         Assert.Equal("semantic", definition.SemanticText);
         Assert.Equal(SegmentSelectionMode.Single, definition.SelectionMode);
         Assert.Equal(SegmentAssignmentScope.Product, definition.AssignmentScope);
-        Assert.True(definition.IsRequired);
         Assert.Equal(SegmentDefinitionStatus.Active, definition.Status);
     }
 
@@ -166,7 +162,6 @@ public class SegmentDefinitionTests
             null,
             SegmentSelectionMode.Single,
             SegmentAssignmentScope.Product,
-            false,
             SegmentDefinitionStatus.Draft);
 
         Assert.Equal(SegmentDefinitionStatus.Draft, definition.Status);
@@ -183,7 +178,6 @@ public class SegmentDefinitionTests
             "New semantic text",
             definition.SelectionMode,
             definition.AssignmentScope,
-            definition.IsRequired,
             SegmentDefinitionStatus.Draft);
 
         Assert.Equal("New Name", definition.Name.Value);
@@ -195,7 +189,7 @@ public class SegmentDefinitionTests
     [Fact]
     public void Structural_change_works_in_draft()
     {
-        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product, isRequired: false);
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
 
         definition.Update(
             definition.Name,
@@ -203,18 +197,16 @@ public class SegmentDefinitionTests
             definition.SemanticText,
             SegmentSelectionMode.Multiple,
             SegmentAssignmentScope.Sku,
-            true,
             SegmentDefinitionStatus.Draft);
 
         Assert.Equal(SegmentSelectionMode.Multiple, definition.SelectionMode);
         Assert.Equal(SegmentAssignmentScope.Sku, definition.AssignmentScope);
-        Assert.True(definition.IsRequired);
     }
 
     [Fact]
     public void Structural_change_outside_draft_is_rejected()
     {
-        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product, isRequired: false);
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
 
         definition.Update(
             definition.Name,
@@ -222,7 +214,6 @@ public class SegmentDefinitionTests
             definition.SemanticText,
             definition.SelectionMode,
             definition.AssignmentScope,
-            definition.IsRequired,
             SegmentDefinitionStatus.Active);
 
         Assert.Throws<SegmentDefinitionStructuralChangeNotAllowedException>(() =>
@@ -232,14 +223,13 @@ public class SegmentDefinitionTests
                 definition.SemanticText,
                 SegmentSelectionMode.Multiple,
                 definition.AssignmentScope,
-                definition.IsRequired,
                 definition.Status));
     }
 
     [Fact]
     public void Keeping_same_structural_values_outside_draft_is_allowed()
     {
-        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product, isRequired: false);
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
 
         definition.Update(
             definition.Name,
@@ -247,7 +237,6 @@ public class SegmentDefinitionTests
             definition.SemanticText,
             definition.SelectionMode,
             definition.AssignmentScope,
-            definition.IsRequired,
             SegmentDefinitionStatus.Active);
 
         // Metadata-only change, same structural values, while Active.
@@ -257,7 +246,6 @@ public class SegmentDefinitionTests
             definition.SemanticText,
             definition.SelectionMode,
             definition.AssignmentScope,
-            definition.IsRequired,
             definition.Status);
 
         Assert.Equal("Renamed", definition.Name.Value);
@@ -285,7 +273,6 @@ public class SegmentDefinitionTests
             definition.SemanticText,
             definition.SelectionMode,
             definition.AssignmentScope,
-            definition.IsRequired,
             to);
 
         Assert.Equal(to, definition.Status);
@@ -311,7 +298,6 @@ public class SegmentDefinitionTests
                 definition.SemanticText,
                 definition.SelectionMode,
                 definition.AssignmentScope,
-                definition.IsRequired,
                 to));
     }
 
@@ -328,7 +314,6 @@ public class SegmentDefinitionTests
                 definition.SemanticText,
                 definition.SelectionMode,
                 definition.AssignmentScope,
-                definition.IsRequired,
                 definition.Status));
     }
 
@@ -351,7 +336,6 @@ public class SegmentDefinitionTests
                 definition.SemanticText,
                 definition.SelectionMode,
                 definition.AssignmentScope,
-                definition.IsRequired,
                 status);
         }
     }

@@ -13,6 +13,4 @@ public sealed class CreateSegmentDefinitionCommand
     public required string SelectionMode { get; init; }
 
     public required string AssignmentScope { get; init; }
-
-    public required bool IsRequired { get; init; }
 }

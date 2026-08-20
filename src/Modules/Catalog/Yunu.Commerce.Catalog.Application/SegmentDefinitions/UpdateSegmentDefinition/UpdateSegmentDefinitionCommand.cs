@@ -14,7 +14,5 @@ public sealed class UpdateSegmentDefinitionCommand
 
     public required string AssignmentScope { get; init; }
 
-    public required bool IsRequired { get; init; }
-
     public required string Status { get; init; }
 }

@@ -38,7 +38,7 @@ public sealed class SqlSegmentEmbeddingSourceRepository : ISegmentEmbeddingSourc
     {
         const string sql = """
             SELECT SegmentDefinitionId, Code, Name, Description, SemanticText,
-                   SelectionMode, AssignmentScope, IsRequired, UpdatedAt
+                   SelectionMode, AssignmentScope, UpdatedAt
             FROM Catalog.SegmentDefinitions
             WHERE Status = 'Active'
             ORDER BY Code
@@ -63,8 +63,7 @@ public sealed class SqlSegmentEmbeddingSourceRepository : ISegmentEmbeddingSourc
                 SemanticText = reader.IsDBNull(4) ? null : reader.GetString(4),
                 SelectionMode = reader.GetString(5),
                 AssignmentScope = reader.GetString(6),
-                IsRequired = reader.GetBoolean(7),
-                UpdatedAt = DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc)
+                UpdatedAt = DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)
             });
         }
 

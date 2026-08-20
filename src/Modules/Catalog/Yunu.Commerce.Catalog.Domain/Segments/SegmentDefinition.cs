@@ -13,8 +13,8 @@ public sealed class InvalidSegmentDefinitionStatusTransitionException : Exceptio
 }
 
 /// <summary>
-/// Thrown when a structural field (SelectionMode, AssignmentScope,
-/// IsRequired) is changed while the Segment Definition is not in
+/// Thrown when a structural field (SelectionMode, AssignmentScope) is
+/// changed while the Segment Definition is not in
 /// <see cref="SegmentDefinitionStatus.Draft"/>. This is a temporary
 /// protection until Product/Sku/canonical association usage checks exist.
 /// </summary>
@@ -36,6 +36,13 @@ public sealed class SegmentDefinitionStructuralChangeNotAllowedException : Excep
 /// until <see cref="Create"/>'s Aggregate is assigned an identity by
 /// ISegmentDefinitionRepository.AddAsync. Zero is never used as a
 /// placeholder identity (see <see cref="SegmentDefinitionId"/>).
+///
+/// Does not carry an IsRequired flag: obligatoriness of a Segment is
+/// contextual to where it is associated in the Canonical Taxonomy, not a
+/// global property of the Definition itself. That contextual value lives
+/// exclusively on Catalog.CanonicalTaxonomyNodeSegmentDefinitions.IsRequired
+/// and is surfaced by EffectiveSegmentDefinitionResolver (docs task:
+/// "Consolidar a semântica de IsRequired em Segments").
 /// </summary>
 public sealed class SegmentDefinition
 {
@@ -66,8 +73,6 @@ public sealed class SegmentDefinition
 
     public SegmentAssignmentScope AssignmentScope { get; private set; }
 
-    public bool IsRequired { get; private set; }
-
     public SegmentDefinitionStatus Status { get; private set; }
 
     private SegmentDefinition(
@@ -79,7 +84,6 @@ public sealed class SegmentDefinition
         string? semanticText,
         SegmentSelectionMode selectionMode,
         SegmentAssignmentScope assignmentScope,
-        bool isRequired,
         SegmentDefinitionStatus status)
     {
         Id = id;
@@ -90,7 +94,6 @@ public sealed class SegmentDefinition
         SemanticText = semanticText;
         SelectionMode = selectionMode;
         AssignmentScope = assignmentScope;
-        IsRequired = isRequired;
         Status = status;
     }
 
@@ -105,8 +108,7 @@ public sealed class SegmentDefinition
         string? description,
         string? semanticText,
         SegmentSelectionMode selectionMode,
-        SegmentAssignmentScope assignmentScope,
-        bool isRequired)
+        SegmentAssignmentScope assignmentScope)
     {
         ArgumentNullException.ThrowIfNull(code);
         ArgumentNullException.ThrowIfNull(name);
@@ -124,7 +126,6 @@ public sealed class SegmentDefinition
             normalizedSemanticText,
             selectionMode,
             assignmentScope,
-            isRequired,
             SegmentDefinitionStatus.Draft);
     }
 
@@ -142,7 +143,6 @@ public sealed class SegmentDefinition
         string? semanticText,
         SegmentSelectionMode selectionMode,
         SegmentAssignmentScope assignmentScope,
-        bool isRequired,
         SegmentDefinitionStatus status)
     {
         ArgumentNullException.ThrowIfNull(code);
@@ -157,7 +157,6 @@ public sealed class SegmentDefinition
             semanticText,
             selectionMode,
             assignmentScope,
-            isRequired,
             status);
     }
 
@@ -178,10 +177,10 @@ public sealed class SegmentDefinition
     /// <summary>
     /// Full update of the mutable fields. Code is never accepted here: it is
     /// immutable after creation. Structural fields (SelectionMode,
-    /// AssignmentScope, IsRequired) can only change while the Definition is
-    /// Draft; outside Draft, keeping the same structural values is allowed,
-    /// but changing them throws. The Status transition is validated and
-    /// applied only after the other fields have been validated/applied.
+    /// AssignmentScope) can only change while the Definition is Draft;
+    /// outside Draft, keeping the same structural values is allowed, but
+    /// changing them throws. The Status transition is validated and applied
+    /// only after the other fields have been validated/applied.
     /// </summary>
     public void Update(
         SegmentDefinitionName name,
@@ -189,7 +188,6 @@ public sealed class SegmentDefinition
         string? semanticText,
         SegmentSelectionMode selectionMode,
         SegmentAssignmentScope assignmentScope,
-        bool isRequired,
         SegmentDefinitionStatus status)
     {
         ArgumentNullException.ThrowIfNull(name);
@@ -202,13 +200,12 @@ public sealed class SegmentDefinition
 
         var structuralChanged =
             selectionMode != SelectionMode ||
-            assignmentScope != AssignmentScope ||
-            isRequired != IsRequired;
+            assignmentScope != AssignmentScope;
 
         if (structuralChanged && Status != SegmentDefinitionStatus.Draft)
         {
             throw new SegmentDefinitionStructuralChangeNotAllowedException(
-                "Structural fields (SelectionMode, AssignmentScope, IsRequired) can only be changed while the SegmentDefinition is Draft.");
+                "Structural fields (SelectionMode, AssignmentScope) can only be changed while the SegmentDefinition is Draft.");
         }
 
         var normalizedDescription = NormalizeOptionalText(description, DescriptionMaxLength, nameof(description));
@@ -220,7 +217,6 @@ public sealed class SegmentDefinition
         SemanticText = normalizedSemanticText;
         SelectionMode = selectionMode;
         AssignmentScope = assignmentScope;
-        IsRequired = isRequired;
 
         TransitionTo(status);
     }

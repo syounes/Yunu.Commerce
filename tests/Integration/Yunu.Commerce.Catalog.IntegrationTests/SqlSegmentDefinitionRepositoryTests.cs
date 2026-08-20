@@ -78,8 +78,7 @@ public sealed class SqlSegmentDefinitionRepositoryTests : IAsyncLifetime
             "Some description",
             "Some semantic text",
             SegmentSelectionMode.Single,
-            SegmentAssignmentScope.Product,
-            isRequired: true);
+            SegmentAssignmentScope.Product);
     }
 
     [Fact]
@@ -109,7 +108,6 @@ public sealed class SqlSegmentDefinitionRepositoryTests : IAsyncLifetime
         Assert.Equal("Some semantic text", persisted.SemanticText);
         Assert.Equal(SegmentSelectionMode.Single, persisted.SelectionMode);
         Assert.Equal(SegmentAssignmentScope.Product, persisted.AssignmentScope);
-        Assert.True(persisted.IsRequired);
         Assert.Equal(SegmentDefinitionStatus.Draft, persisted.Status);
     }
 
@@ -162,7 +160,6 @@ public sealed class SqlSegmentDefinitionRepositoryTests : IAsyncLifetime
             "Updated semantic text",
             persisted.SelectionMode,
             persisted.AssignmentScope,
-            persisted.IsRequired,
             SegmentDefinitionStatus.Active);
 
         await _repository.UpdateAsync(persisted, CancellationToken.None);
@@ -190,7 +187,6 @@ public sealed class SqlSegmentDefinitionRepositoryTests : IAsyncLifetime
             persisted.SemanticText,
             persisted.SelectionMode,
             persisted.AssignmentScope,
-            persisted.IsRequired,
             persisted.Status);
 
         await _repository.UpdateAsync(persisted, CancellationToken.None);
@@ -226,7 +222,6 @@ public sealed class SqlSegmentDefinitionRepositoryTests : IAsyncLifetime
             persisted.SemanticText,
             persisted.SelectionMode,
             persisted.AssignmentScope,
-            persisted.IsRequired,
             persisted.Status);
         await _repository.UpdateAsync(persisted, CancellationToken.None);
 

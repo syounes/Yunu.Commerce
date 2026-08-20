@@ -26,7 +26,6 @@ public sealed class SynchronizeSegmentEmbeddingsHandlerTests
         SemanticText = "masculino feminino unissex",
         SelectionMode = "Single",
         AssignmentScope = assignmentScope,
-        IsRequired = true,
         UpdatedAt = updatedAt ?? new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
     };
 

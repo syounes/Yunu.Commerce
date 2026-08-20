@@ -100,7 +100,6 @@ public sealed class SynchronizeSegmentEmbeddingsHandler
             var metadata = JsonSerializer.Serialize(new
             {
                 selectionMode = definition.SelectionMode,
-                isRequired = definition.IsRequired,
                 source = DefinitionSource
             });
 

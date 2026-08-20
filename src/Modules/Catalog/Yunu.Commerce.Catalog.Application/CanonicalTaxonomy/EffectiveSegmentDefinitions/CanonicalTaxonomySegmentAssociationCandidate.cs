@@ -50,9 +50,9 @@ public sealed record CanonicalTaxonomySegmentAssociationCandidate
     /// <summary>
     /// Catalog.CanonicalTaxonomyNodeSegmentDefinitions.IsRequired: whether
     /// this specific node-to-definition association is required. This is the
-    /// value the effective resolution surfaces (see
-    /// EffectiveSegmentDefinitionResolver remarks on the separate,
-    /// non-contextual SegmentDefinitions.IsRequired column).
+    /// sole source of truth for obligatoriness (docs task: "Consolidar a
+    /// semântica de IsRequired em Segments"); Catalog.SegmentDefinitions no
+    /// longer persists an IsRequired column.
     /// </summary>
     public required bool AssociationIsRequired { get; init; }
 

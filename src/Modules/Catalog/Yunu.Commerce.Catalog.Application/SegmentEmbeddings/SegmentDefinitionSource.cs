@@ -28,7 +28,5 @@ public sealed class SegmentDefinitionSource
 
     public required string AssignmentScope { get; init; }
 
-    public required bool IsRequired { get; init; }
-
     public required DateTime UpdatedAt { get; init; }
 }

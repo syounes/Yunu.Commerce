@@ -7,10 +7,13 @@ namespace Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 /// Segment Options (docs task: "Implementar sincronização de embeddings de
 /// segmentos"). The same source record always produces exactly the same
 /// semantic text: field order and formatting are fixed, and only fields that
-/// carry semantic meaning are included. SQL Server IDs, AssignmentScope,
-/// SelectionMode and IsRequired are never included in the text sent to the
-/// embedding model, since those are structural metadata/filters whose changes
-/// must not trigger unnecessary provider calls.
+/// carry semantic meaning are included. SQL Server IDs, AssignmentScope and
+/// SelectionMode are never included in the text sent to the embedding model,
+/// since those are structural metadata/filters whose changes must not
+/// trigger unnecessary provider calls. IsRequired is not a
+/// SegmentDefinition-level concept at all (docs task: "Consolidar a
+/// semântica de IsRequired em Segments") and is therefore never part of this
+/// source model or its semantic text.
 /// </summary>
 public static class SegmentSemanticDocumentBuilder
 {
