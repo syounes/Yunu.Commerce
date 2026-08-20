@@ -104,6 +104,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<ICanonicalTaxonomySegmentAssociationReader, SqlCanonicalTaxonomySegmentAssociationReader>();
         services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
         services.AddSingleton<ISegmentDefinitionRepository, SqlSegmentDefinitionRepository>();
+        services.AddSingleton<ISegmentOptionRepository, SqlSegmentOptionRepository>();
 
         services.AddSingleton<ISegmentEmbeddingSourceRepository, SqlSegmentEmbeddingSourceRepository>();
         services.AddSingleton<ISegmentEmbeddingRepository, PostgreSqlSegmentEmbeddingRepository>();

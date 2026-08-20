@@ -35,6 +35,8 @@ using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentOptionById;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentOptionsByDefinition;
 using Yunu.Commerce.Catalog.Application.SegmentDefinitions.CreateSegmentDefinition;
 using Yunu.Commerce.Catalog.Application.SegmentDefinitions.UpdateSegmentDefinition;
+using Yunu.Commerce.Catalog.Application.SegmentOptions.CreateSegmentOption;
+using Yunu.Commerce.Catalog.Application.SegmentOptions.UpdateSegmentOption;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 
 namespace Yunu.Commerce.Catalog.Application;
@@ -78,6 +80,8 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GetSegmentOptionByCodeHandler>();
         services.AddScoped<CreateSegmentDefinitionHandler>();
         services.AddScoped<UpdateSegmentDefinitionHandler>();
+        services.AddScoped<CreateSegmentOptionHandler>();
+        services.AddScoped<UpdateSegmentOptionHandler>();
 
         services.AddScoped<CreateProductProposalHandler>();
         services.AddScoped<GetProductProposalByIdHandler>();
