@@ -16,6 +16,7 @@ using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.ProductProposals;
 using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Segments;
 using Yunu.Commerce.Catalog.Domain.Skus;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.AttributeEmbeddings.PostgreSql;
@@ -100,6 +101,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<ICanonicalTaxonomyRepository, SqlCanonicalTaxonomyRepository>();
         services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
+        services.AddSingleton<ISegmentDefinitionRepository, SqlSegmentDefinitionRepository>();
 
         services.AddSingleton<ISegmentEmbeddingSourceRepository, SqlSegmentEmbeddingSourceRepository>();
         services.AddSingleton<ISegmentEmbeddingRepository, PostgreSqlSegmentEmbeddingRepository>();
