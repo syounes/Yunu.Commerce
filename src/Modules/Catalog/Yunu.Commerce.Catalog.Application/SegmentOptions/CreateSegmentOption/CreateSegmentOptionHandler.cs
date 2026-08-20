@@ -7,10 +7,13 @@ namespace Yunu.Commerce.Catalog.Application.SegmentOptions.CreateSegmentOption;
 /// Domain + Write-Side de SegmentOption"), mirroring
 /// <see cref="Yunu.Commerce.Catalog.Application.SegmentDefinitions.CreateSegmentDefinition.CreateSegmentDefinitionHandler"/>.
 ///
-/// Does not enforce a policy based on the parent SegmentDefinition's
-/// Status (e.g. rejecting creation under a non-Active Definition): the
-/// project does not yet define that policy, so this handler intentionally
-/// only requires the parent Definition to exist.
+/// Parent lifecycle policy (docs task: "Yunu.Commerce V8 - Lifecycle +
+/// Usage Guards de Segments" - "Regra minima obrigatoria"): a new Option
+/// cannot be created under an Archived parent Definition, since Archived is
+/// terminal and must not receive new structural values. Draft/Active/
+/// Inactive parents are all allowed to receive new Options: the project
+/// does not define a stricter policy for Draft/Inactive, and blocking only
+/// Archived is the smallest rule that prevents an evident inconsistency.
 /// </summary>
 public sealed class CreateSegmentOptionHandler
 {
@@ -33,6 +36,12 @@ public sealed class CreateSegmentOptionHandler
         if (definition is null)
         {
             throw new KeyNotFoundException($"SegmentDefinition '{command.SegmentDefinitionId}' not found.");
+        }
+
+        if (definition.Status == SegmentDefinitionStatus.Archived)
+        {
+            throw new SegmentDefinitionArchivedException(
+                $"SegmentDefinition '{command.SegmentDefinitionId}' is Archived and cannot receive new SegmentOptions.");
         }
 
         var code = new SegmentOptionCode(command.Code);

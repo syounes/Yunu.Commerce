@@ -46,4 +46,26 @@ public sealed class MongoSkuRepository : ISkuRepository
 
         return documents.Select(SkuDocumentMapper.ToDomain).ToList();
     }
+
+    public async Task<bool> ExistsBySegmentDefinitionIdAsync(
+        Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId segmentDefinitionId,
+        CancellationToken cancellationToken)
+    {
+        return await _collection
+            .Find(document => document.SegmentAssignments != null
+                && document.SegmentAssignments.Any(sa => sa.SegmentDefinitionId == segmentDefinitionId.Value))
+            .Limit(1)
+            .AnyAsync(cancellationToken);
+    }
+
+    public async Task<bool> ExistsBySegmentOptionIdAsync(
+        Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId segmentOptionId,
+        CancellationToken cancellationToken)
+    {
+        return await _collection
+            .Find(document => document.SegmentAssignments != null
+                && document.SegmentAssignments.Any(sa => sa.Options.Any(o => o.SegmentOptionId == segmentOptionId.Value)))
+            .Limit(1)
+            .AnyAsync(cancellationToken);
+    }
 }

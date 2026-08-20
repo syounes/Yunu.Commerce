@@ -12,6 +12,7 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmb
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomyEmbeddings;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
+using Yunu.Commerce.Catalog.Application.SegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
@@ -105,6 +106,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
         services.AddSingleton<ISegmentDefinitionRepository, SqlSegmentDefinitionRepository>();
         services.AddSingleton<ISegmentOptionRepository, SqlSegmentOptionRepository>();
+        services.AddSingleton<ISegmentDefinitionUsageReader, SqlSegmentDefinitionUsageReader>();
 
         services.AddSingleton<ISegmentEmbeddingSourceRepository, SqlSegmentEmbeddingSourceRepository>();
         services.AddSingleton<ISegmentEmbeddingRepository, PostgreSqlSegmentEmbeddingRepository>();

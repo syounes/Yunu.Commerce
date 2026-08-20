@@ -61,4 +61,40 @@ internal sealed class FakeProductRepository : IProductRepository
     {
         _brandIdsInUse.Add(brandId);
     }
+
+    public Task<bool> ExistsBySegmentDefinitionIdAsync(Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId segmentDefinitionId, CancellationToken cancellationToken)
+    {
+        var exists = _products.Values.Any(p => p.SegmentAssignments.Any(sa => sa.SegmentDefinitionId == segmentDefinitionId))
+            || _segmentDefinitionIdsInUse.Contains(segmentDefinitionId);
+        return Task.FromResult(exists);
+    }
+
+    private readonly HashSet<Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId> _segmentDefinitionIdsInUse = new();
+
+    /// <summary>
+    /// Test-only helper to simulate a SegmentDefinition being referenced by a
+    /// Product, without requiring a fully constructed Product aggregate.
+    /// </summary>
+    public void MarkSegmentDefinitionInUse(Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId segmentDefinitionId)
+    {
+        _segmentDefinitionIdsInUse.Add(segmentDefinitionId);
+    }
+
+    public Task<bool> ExistsBySegmentOptionIdAsync(Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId segmentOptionId, CancellationToken cancellationToken)
+    {
+        var exists = _products.Values.Any(p => p.SegmentAssignments.Any(sa => sa.Options.Any(o => o.SegmentOptionId == segmentOptionId)))
+            || _segmentOptionIdsInUse.Contains(segmentOptionId);
+        return Task.FromResult(exists);
+    }
+
+    private readonly HashSet<Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId> _segmentOptionIdsInUse = new();
+
+    /// <summary>
+    /// Test-only helper to simulate a SegmentOption being referenced by a
+    /// Product, without requiring a fully constructed Product aggregate.
+    /// </summary>
+    public void MarkSegmentOptionInUse(Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId segmentOptionId)
+    {
+        _segmentOptionIdsInUse.Add(segmentOptionId);
+    }
 }

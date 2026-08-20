@@ -21,4 +21,24 @@ public interface ISkuRepository
     Task<IReadOnlyCollection<Sku>> GetByProductIdAsync(
         ProductId productId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether any Sku currently carries a Segment assignment for the given
+    /// SegmentDefinition (docs task: "Yunu.Commerce V8 - Lifecycle + Usage
+    /// Guards de Segments"). Used by Application to block archiving a
+    /// SegmentDefinition that is still in use.
+    /// </summary>
+    Task<bool> ExistsBySegmentDefinitionIdAsync(
+        Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId segmentDefinitionId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether any Sku currently selects the given SegmentOption within one
+    /// of its Segment assignments (docs task: "Yunu.Commerce V8 -
+    /// Lifecycle + Usage Guards de Segments"). Used by Application to block
+    /// archiving a SegmentOption that is still in use.
+    /// </summary>
+    Task<bool> ExistsBySegmentOptionIdAsync(
+        Yunu.Commerce.Catalog.Domain.Segments.SegmentOptionId segmentOptionId,
+        CancellationToken cancellationToken);
 }

@@ -40,7 +40,7 @@ public class UpdateSegmentOptionHandlerTests
         var definitionRepository = new FakeSegmentDefinitionRepository();
         var optionRepository = new FakeSegmentOptionRepository();
         var (_, segmentOptionId) = await CreateOptionAsync(definitionRepository, optionRepository);
-        var handler = new UpdateSegmentOptionHandler(optionRepository);
+        var handler = new UpdateSegmentOptionHandler(optionRepository, new FakeProductRepository(), new FakeSkuRepository());
 
         await handler.HandleAsync(new UpdateSegmentOptionCommand
         {
@@ -66,7 +66,7 @@ public class UpdateSegmentOptionHandlerTests
     public async Task Update_rejects_nonexistent_option()
     {
         var optionRepository = new FakeSegmentOptionRepository();
-        var handler = new UpdateSegmentOptionHandler(optionRepository);
+        var handler = new UpdateSegmentOptionHandler(optionRepository, new FakeProductRepository(), new FakeSkuRepository());
 
         var command = new UpdateSegmentOptionCommand
         {
@@ -93,7 +93,7 @@ public class UpdateSegmentOptionHandlerTests
             Name = "Feminino"
         }, CancellationToken.None)).SegmentOptionId;
 
-        var handler = new UpdateSegmentOptionHandler(optionRepository);
+        var handler = new UpdateSegmentOptionHandler(optionRepository, new FakeProductRepository(), new FakeSkuRepository());
         var command = new UpdateSegmentOptionCommand
         {
             SegmentOptionId = secondOptionId,
@@ -110,7 +110,7 @@ public class UpdateSegmentOptionHandlerTests
         var definitionRepository = new FakeSegmentDefinitionRepository();
         var optionRepository = new FakeSegmentOptionRepository();
         var (_, segmentOptionId) = await CreateOptionAsync(definitionRepository, optionRepository);
-        var handler = new UpdateSegmentOptionHandler(optionRepository);
+        var handler = new UpdateSegmentOptionHandler(optionRepository, new FakeProductRepository(), new FakeSkuRepository());
 
         var command = new UpdateSegmentOptionCommand
         {
@@ -128,7 +128,7 @@ public class UpdateSegmentOptionHandlerTests
         var definitionRepository = new FakeSegmentDefinitionRepository();
         var optionRepository = new FakeSegmentOptionRepository();
         var (segmentDefinitionId, segmentOptionId) = await CreateOptionAsync(definitionRepository, optionRepository);
-        var handler = new UpdateSegmentOptionHandler(optionRepository);
+        var handler = new UpdateSegmentOptionHandler(optionRepository, new FakeProductRepository(), new FakeSkuRepository());
 
         await handler.HandleAsync(new UpdateSegmentOptionCommand
         {

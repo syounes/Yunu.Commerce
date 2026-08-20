@@ -1,5 +1,6 @@
 ﻿using Yunu.Commerce.Catalog.Domain.Attributes;
 using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Segments;
 using Yunu.Commerce.Catalog.Domain.Skus;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
@@ -26,7 +27,17 @@ internal static class SkuDocumentMapper
             Code = sku.Code.Value,
             Gtin = sku.Gtin,
             Status = sku.Status.ToString(),
-            Attributes = sku.Attributes.Select(ToAttributeDocument).ToList()
+            Attributes = sku.Attributes.Select(ToAttributeDocument).ToList(),
+            SegmentAssignments = sku.SegmentAssignments.Select(sa => new SkuSegmentAssignmentDocument
+            {
+                SegmentDefinitionId = sa.SegmentDefinitionId.Value,
+                SegmentCode = sa.SegmentCode,
+                Options = sa.Options.Select(o => new SkuSegmentOptionSelectionDocument
+                {
+                    SegmentOptionId = o.SegmentOptionId.Value,
+                    OptionCode = o.OptionCode
+                }).ToList()
+            }).ToList()
         };
     }
 
@@ -35,13 +46,20 @@ internal static class SkuDocumentMapper
         var attributes = (document.Attributes ?? new List<SkuAttributeDocument>())
             .Select(ToDomainAttribute);
 
+        var segmentAssignments = (document.SegmentAssignments ?? new List<SkuSegmentAssignmentDocument>())
+            .Select(sa => SegmentAssignment.Hydrate(
+                new SegmentDefinitionId(sa.SegmentDefinitionId),
+                sa.SegmentCode,
+                sa.Options.Select(o => new SegmentOptionSelection(new SegmentOptionId(o.SegmentOptionId), o.OptionCode))));
+
         return Sku.Hydrate(
             new SkuId(document.Id),
             new ProductId(document.ProductId),
             new SkuCode(document.Code),
             document.Gtin,
             Enum.Parse<SkuStatus>(document.Status),
-            attributes);
+            attributes,
+            segmentAssignments);
     }
 
     private static SkuAttributeDocument ToAttributeDocument(SkuAttribute attribute)

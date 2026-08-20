@@ -7,6 +7,16 @@ namespace Yunu.Commerce.Catalog.Application.Tests.SegmentDefinitions;
 
 public class UpdateSegmentDefinitionHandlerTests
 {
+    private static UpdateSegmentDefinitionHandler CreateHandler(
+        FakeSegmentDefinitionRepository repo,
+        FakeSegmentDefinitionUsageReader? usageReader = null,
+        FakeProductRepository? productRepository = null,
+        FakeSkuRepository? skuRepository = null) => new(
+            repo,
+            usageReader ?? new FakeSegmentDefinitionUsageReader(),
+            productRepository ?? new FakeProductRepository(),
+            skuRepository ?? new FakeSkuRepository());
+
     private static async Task<long> CreateDefinitionAsync(FakeSegmentDefinitionRepository repo, string code = "gender", string name = "Gender")
     {
         var createHandler = new CreateSegmentDefinitionHandler(repo);
@@ -39,7 +49,7 @@ public class UpdateSegmentDefinitionHandlerTests
     {
         var repo = new FakeSegmentDefinitionRepository();
         var id = await CreateDefinitionAsync(repo);
-        var handler = new UpdateSegmentDefinitionHandler(repo);
+        var handler = CreateHandler(repo);
 
         await handler.HandleAsync(UpdateCommand(id, name: "New Gender", status: "Active"), CancellationToken.None);
 
@@ -53,7 +63,7 @@ public class UpdateSegmentDefinitionHandlerTests
     public async Task Update_nonexistent_id_returns_error()
     {
         var repo = new FakeSegmentDefinitionRepository();
-        var handler = new UpdateSegmentDefinitionHandler(repo);
+        var handler = CreateHandler(repo);
 
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
             handler.HandleAsync(UpdateCommand(9999), CancellationToken.None));
@@ -64,7 +74,7 @@ public class UpdateSegmentDefinitionHandlerTests
     {
         var repo = new FakeSegmentDefinitionRepository();
         var id = await CreateDefinitionAsync(repo);
-        var handler = new UpdateSegmentDefinitionHandler(repo);
+        var handler = CreateHandler(repo);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             handler.HandleAsync(UpdateCommand(id, status: "NotAStatus"), CancellationToken.None));
@@ -76,7 +86,7 @@ public class UpdateSegmentDefinitionHandlerTests
         var repo = new FakeSegmentDefinitionRepository();
         var firstId = await CreateDefinitionAsync(repo, code: "gender", name: "Gender");
         var secondId = await CreateDefinitionAsync(repo, code: "audience", name: "Audience");
-        var handler = new UpdateSegmentDefinitionHandler(repo);
+        var handler = CreateHandler(repo);
 
         await Assert.ThrowsAsync<SegmentDefinitionConflictException>(() =>
             handler.HandleAsync(UpdateCommand(secondId, name: "Gender"), CancellationToken.None));
@@ -96,7 +106,7 @@ public class UpdateSegmentDefinitionHandlerTests
     {
         var repo = new FakeSegmentDefinitionRepository();
         var id = await CreateDefinitionAsync(repo);
-        var handler = new UpdateSegmentDefinitionHandler(repo);
+        var handler = CreateHandler(repo);
 
         // Move to Active first.
         await handler.HandleAsync(UpdateCommand(id, status: "Active"), CancellationToken.None);
@@ -110,5 +120,57 @@ public class UpdateSegmentDefinitionHandlerTests
     {
         var methods = typeof(Yunu.Commerce.Catalog.Domain.Segments.ISegmentDefinitionRepository).GetMethods();
         Assert.DoesNotContain(methods, m => m.Name.Contains("Delete"));
+    }
+
+    [Fact]
+    public async Task Update_archive_with_no_usage_is_allowed()
+    {
+        var repo = new FakeSegmentDefinitionRepository();
+        var id = await CreateDefinitionAsync(repo);
+        var handler = CreateHandler(repo);
+
+        await handler.HandleAsync(UpdateCommand(id, status: "Archived"), CancellationToken.None);
+
+        var updated = await repo.GetByIdAsync(new Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId(id), CancellationToken.None);
+        Assert.Equal(Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionStatus.Archived, updated!.Status);
+    }
+
+    [Fact]
+    public async Task Update_archive_blocked_by_approved_canonical_association()
+    {
+        var repo = new FakeSegmentDefinitionRepository();
+        var id = await CreateDefinitionAsync(repo);
+        var usageReader = new FakeSegmentDefinitionUsageReader();
+        usageReader.MarkApprovedAssociationInUse(new Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId(id));
+        var handler = CreateHandler(repo, usageReader: usageReader);
+
+        await Assert.ThrowsAsync<SegmentDefinitionInUseException>(() =>
+            handler.HandleAsync(UpdateCommand(id, status: "Archived"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Update_archive_blocked_by_product_usage()
+    {
+        var repo = new FakeSegmentDefinitionRepository();
+        var id = await CreateDefinitionAsync(repo);
+        var productRepository = new FakeProductRepository();
+        productRepository.MarkSegmentDefinitionInUse(new Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId(id));
+        var handler = CreateHandler(repo, productRepository: productRepository);
+
+        await Assert.ThrowsAsync<SegmentDefinitionInUseException>(() =>
+            handler.HandleAsync(UpdateCommand(id, status: "Archived"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Update_archive_blocked_by_sku_usage()
+    {
+        var repo = new FakeSegmentDefinitionRepository();
+        var id = await CreateDefinitionAsync(repo);
+        var skuRepository = new FakeSkuRepository();
+        skuRepository.MarkSegmentDefinitionInUse(new Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionId(id));
+        var handler = CreateHandler(repo, skuRepository: skuRepository);
+
+        await Assert.ThrowsAsync<SegmentDefinitionInUseException>(() =>
+            handler.HandleAsync(UpdateCommand(id, status: "Archived"), CancellationToken.None));
     }
 }

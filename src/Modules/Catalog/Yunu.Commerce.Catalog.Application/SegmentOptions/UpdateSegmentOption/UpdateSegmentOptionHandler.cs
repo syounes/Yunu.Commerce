@@ -1,4 +1,6 @@
-﻿using Yunu.Commerce.Catalog.Domain.Segments;
+﻿using Yunu.Commerce.Catalog.Domain.Products;
+using Yunu.Commerce.Catalog.Domain.Segments;
+using Yunu.Commerce.Catalog.Domain.Skus;
 
 namespace Yunu.Commerce.Catalog.Application.SegmentOptions.UpdateSegmentOption;
 
@@ -8,14 +10,27 @@ namespace Yunu.Commerce.Catalog.Application.SegmentOptions.UpdateSegmentOption;
 /// <see cref="Yunu.Commerce.Catalog.Application.SegmentDefinitions.UpdateSegmentDefinition.UpdateSegmentDefinitionHandler"/>.
 /// SegmentDefinitionId is never accepted here: an Option cannot be moved to
 /// a different Definition (see <see cref="SegmentOption"/> remarks).
+///
+/// Usage guard (docs task: "Yunu.Commerce V8 - Lifecycle + Usage Guards de
+/// Segments"): archiving an Option in active use by at least one Product or
+/// Sku Segment assignment is blocked, mirroring the SegmentDefinition
+/// Archive guard. Only Archive is guarded; no cascade is performed on the
+/// existing assignments.
 /// </summary>
 public sealed class UpdateSegmentOptionHandler
 {
     private readonly ISegmentOptionRepository _repository;
+    private readonly IProductRepository _productRepository;
+    private readonly ISkuRepository _skuRepository;
 
-    public UpdateSegmentOptionHandler(ISegmentOptionRepository repository)
+    public UpdateSegmentOptionHandler(
+        ISegmentOptionRepository repository,
+        IProductRepository productRepository,
+        ISkuRepository skuRepository)
     {
         _repository = repository;
+        _productRepository = productRepository;
+        _skuRepository = skuRepository;
     }
 
     public async Task HandleAsync(UpdateSegmentOptionCommand command, CancellationToken cancellationToken)
@@ -40,6 +55,11 @@ public sealed class UpdateSegmentOptionHandler
                 $"SegmentOption with name '{name.Value}' already exists for SegmentDefinition '{option.SegmentDefinitionId.Value}'.");
         }
 
+        if (status == SegmentOptionStatus.Archived && option.Status != SegmentOptionStatus.Archived)
+        {
+            await EnsureNotInUseAsync(id, cancellationToken);
+        }
+
         option.Update(
             name,
             command.Description,
@@ -48,6 +68,21 @@ public sealed class UpdateSegmentOptionHandler
             status);
 
         await _repository.UpdateAsync(option, cancellationToken);
+    }
+
+    private async Task EnsureNotInUseAsync(SegmentOptionId id, CancellationToken cancellationToken)
+    {
+        if (await _productRepository.ExistsBySegmentOptionIdAsync(id, cancellationToken))
+        {
+            throw new SegmentOptionInUseException(
+                $"SegmentOption '{id.Value}' is used by at least one Product and cannot be archived.");
+        }
+
+        if (await _skuRepository.ExistsBySegmentOptionIdAsync(id, cancellationToken))
+        {
+            throw new SegmentOptionInUseException(
+                $"SegmentOption '{id.Value}' is used by at least one Sku and cannot be archived.");
+        }
     }
 
     private static TEnum ParseEnum<TEnum>(string value, string paramName) where TEnum : struct, Enum

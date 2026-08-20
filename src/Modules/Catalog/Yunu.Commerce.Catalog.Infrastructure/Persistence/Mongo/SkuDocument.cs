@@ -14,6 +14,11 @@ namespace Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 /// assigned attributes, is written/read atomically with the rest of the
 /// document. Legacy documents without an "Attributes" field hydrate as an
 /// empty collection (no destructive migration required).
+///
+/// Segment assignments (docs task: "Yunu.Commerce V8 - Lifecycle + Usage
+/// Guards de Segments") persist only the explicit Sku-level override; a
+/// missing/null "SegmentAssignments" field on legacy documents hydrates as
+/// an empty collection.
 /// </summary>
 public sealed class SkuDocument
 {
@@ -31,6 +36,33 @@ public sealed class SkuDocument
     public string Status { get; set; } = string.Empty;
 
     public List<SkuAttributeDocument>? Attributes { get; set; }
+
+    public List<SkuSegmentAssignmentDocument>? SegmentAssignments { get; set; }
+}
+
+/// <summary>
+/// Embedded persisted shape of a single Sku Segment assignment, mirroring
+/// <see cref="Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo.SegmentAssignmentDocument"/>
+/// used by Product persistence.
+/// </summary>
+public sealed class SkuSegmentAssignmentDocument
+{
+    public long SegmentDefinitionId { get; set; }
+
+    public string SegmentCode { get; set; } = string.Empty;
+
+    public List<SkuSegmentOptionSelectionDocument> Options { get; set; } = new();
+}
+
+/// <summary>
+/// Embedded persisted shape of a single selected option within a Sku Segment
+/// assignment.
+/// </summary>
+public sealed class SkuSegmentOptionSelectionDocument
+{
+    public long SegmentOptionId { get; set; }
+
+    public string OptionCode { get; set; } = string.Empty;
 }
 
 /// <summary>
