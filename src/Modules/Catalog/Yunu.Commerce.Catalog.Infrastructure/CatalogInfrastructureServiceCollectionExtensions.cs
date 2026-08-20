@@ -5,6 +5,7 @@ using Npgsql;
 using Yunu.Commerce.Catalog.Application.AttributeCatalog;
 using Yunu.Commerce.Catalog.Application.AttributeEmbeddings;
 using Yunu.Commerce.Catalog.Application.AttributeResolution;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.EffectiveSegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.CategoryResolution;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy;
 using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.GenerateGoogleTaxonomyEmbedding;
@@ -100,6 +101,7 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<IBrandRepository, SqlBrandRepository>();
 
         services.AddSingleton<ICanonicalTaxonomyRepository, SqlCanonicalTaxonomyRepository>();
+        services.AddSingleton<ICanonicalTaxonomySegmentAssociationReader, SqlCanonicalTaxonomySegmentAssociationReader>();
         services.AddSingleton<ISegmentCatalogRepository, SqlSegmentCatalogRepository>();
         services.AddSingleton<ISegmentDefinitionRepository, SqlSegmentDefinitionRepository>();
 

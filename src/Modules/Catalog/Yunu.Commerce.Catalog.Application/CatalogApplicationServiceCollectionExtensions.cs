@@ -21,6 +21,7 @@ using Yunu.Commerce.Catalog.Application.Brands.UpdateBrand;
 using Yunu.Commerce.Catalog.Application.Brands.ResolveBrand;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.DeleteCanonicalTaxonomyNode;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.EffectiveSegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyChildren;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyNodeById;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyRoots;
@@ -67,6 +68,7 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GetCanonicalTaxonomyRootsHandler>();
         services.AddScoped<UpdateCanonicalTaxonomyNodeHandler>();
         services.AddScoped<DeleteCanonicalTaxonomyNodeHandler>();
+        services.AddScoped<GetEffectiveSegmentDefinitionsHandler>();
 
         services.AddScoped<GetSegmentDefinitionsHandler>();
         services.AddScoped<GetSegmentDefinitionByIdHandler>();
