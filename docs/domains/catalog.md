@@ -303,20 +303,31 @@ which supersedes any earlier implication that Product directly owns a
 `CategoryId`.
 
 Product does **not** reference `CategoryId`, `SubCategoryId` or `DepartmentId`
-directly. The implemented Product Aggregate exposes:
+directly, and does **not** store a Google-classification value
+(`GoogleCategoryId`, a Google taxonomy path, or any denormalized Google
+category reference) as its canonical classification. The implemented Product
+Aggregate exposes:
 
 ````````markdown
-Product does not store any internal Family hierarchy reference.
+Product.CanonicalTaxonomyNodeId
+````````
 
-`GoogleCategory` is a denormalized reference (`GoogleCategoryReference.Id` +
-`GoogleCategoryReference.Path`) resolved by Catalog.Application from the
-canonical Google Product Taxonomy (SQL Server `GoogleTaxonomyCategories`,
-implemented behind `IGoogleTaxonomyRepository`) **before** the Product
-Aggregate is constructed. Only active, leaf categories may be used. The Product
-Domain never performs this lookup itself.
+`CanonicalTaxonomyNodeId` is the Product Aggregate's canonical classification
+reference, pointing at a node in the Yunu Canonical Taxonomy
+(`Catalog.CanonicalTaxonomyNodes`, SQL Server, the source of truth). The node
+is resolved and validated by Catalog.Application — not by the Product Domain
+— before the Product Aggregate is constructed; the selected node must be
+existing, `Active` and a leaf. The Product Aggregate stores only the resolved
+node's identity, never a caller-provided taxonomy path/name/depth.
+
+Google Product Taxonomy remains a distinct, legitimate external taxonomy used
+elsewhere in Catalog (e.g. `ProductProposal` category resolution/discovery,
+and `CanonicalTaxonomyNode`'s own optional external `GoogleCategoryId`
+mapping to Google Product Taxonomy); it is not, and does not replace, the
+Product Aggregate's own classification reference.
 
 ---
-````````
+
 
 # 12. Brand
 
