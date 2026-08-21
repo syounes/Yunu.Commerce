@@ -10,8 +10,6 @@ public sealed class CanonicalTaxonomyNodeResponse
 
     public long? ParentId { get; init; }
 
-    public long? GoogleCategoryId { get; init; }
-
     public required string Code { get; init; }
 
     public required string Name { get; init; }
@@ -21,8 +19,6 @@ public sealed class CanonicalTaxonomyNodeResponse
     public required int Depth { get; init; }
 
     public required string Path { get; init; }
-
-    public required string Source { get; init; }
 
     public required string Status { get; init; }
 }

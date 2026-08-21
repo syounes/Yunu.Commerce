@@ -185,14 +185,12 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
         return CanonicalTaxonomyNode.Hydrate(
             new CanonicalTaxonomyNodeId(id),
             node.ParentId,
-            node.GoogleCategoryId,
             node.Code,
             node.Name,
             node.NormalizedName,
             node.Description,
             node.Depth,
             node.Path,
-            node.Source,
             node.Status);
     }
 

@@ -59,8 +59,7 @@ public sealed class GetProductByIdHandler
             Id = product.CanonicalTaxonomyNodeId.Value,
             Code = categoryNode?.Code ?? string.Empty,
             Name = categoryNode?.Name ?? string.Empty,
-            Path = categoryNode?.Path ?? string.Empty,
-            Source = categoryNode?.Source.ToString() ?? string.Empty
+            Path = categoryNode?.Path ?? string.Empty
         };
 
         var segments = new List<SegmentAssignmentResponse>();

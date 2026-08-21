@@ -10,7 +10,10 @@ namespace Yunu.Commerce.Catalog.Infrastructure.CanonicalTaxonomy.SqlServer;
 /// (docs task: "Canonical Taxonomy + Segments Domain" §4, §19-§22). Uses plain
 /// ADO.NET (Microsoft.Data.SqlClient), matching the existing Brands/GoogleTaxonomy
 /// adapters. Persists to Catalog.CanonicalTaxonomyNodes
-/// (deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql).
+/// (deploy/databases/sqlserver/013-remove-canonical-provider-coupling.sql).
+/// No provider identity/provenance columns (GoogleCategoryId, Source) are
+/// read or written here (docs task: "Canonical Taxonomy Provider
+/// Decoupling"; docs/adr/0014-provider-neutral-source-taxonomy.md).
 /// </summary>
 public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepository
 {
@@ -30,10 +33,10 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
 
         const string sql = """
             INSERT INTO Catalog.CanonicalTaxonomyNodes
-                (ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status)
+                (ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status)
             OUTPUT INSERTED.CanonicalTaxonomyNodeId
             VALUES
-                (@ParentId, @Code, @Name, @NormalizedName, @Description, @Depth, @Path, @GoogleCategoryId, @Source, @Status)
+                (@ParentId, @Code, @Name, @NormalizedName, @Description, @Depth, @Path, @Status)
             """;
 
         await using var connection = new SqlConnection(_connectionString);
@@ -47,8 +50,6 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         command.Parameters.AddWithValue("@Description", (object?)node.Description ?? DBNull.Value);
         command.Parameters.AddWithValue("@Depth", node.Depth);
         command.Parameters.AddWithValue("@Path", node.Path);
-        command.Parameters.AddWithValue("@GoogleCategoryId", (object?)node.GoogleCategoryId ?? DBNull.Value);
-        command.Parameters.AddWithValue("@Source", node.Source.ToString());
         command.Parameters.AddWithValue("@Status", node.Status.ToString());
 
         var generatedId = (long)(await command.ExecuteScalarAsync(cancellationToken))!;
@@ -145,10 +146,10 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
 
             const string insertSql = """
                 INSERT INTO Catalog.CanonicalTaxonomyNodes
-                    (ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status)
+                    (ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status)
                 OUTPUT INSERTED.CanonicalTaxonomyNodeId
                 VALUES
-                    (@ParentId, @Code, @Name, @NormalizedName, @Description, @Depth, @Path, @GoogleCategoryId, @Source, @Status)
+                    (@ParentId, @Code, @Name, @NormalizedName, @Description, @Depth, @Path, @Status)
                 """;
 
             long generatedId;
@@ -161,8 +162,6 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
                 insertCommand.Parameters.AddWithValue("@Description", (object?)node.Description ?? DBNull.Value);
                 insertCommand.Parameters.AddWithValue("@Depth", node.Depth);
                 insertCommand.Parameters.AddWithValue("@Path", node.Path);
-                insertCommand.Parameters.AddWithValue("@GoogleCategoryId", (object?)node.GoogleCategoryId ?? DBNull.Value);
-                insertCommand.Parameters.AddWithValue("@Source", node.Source.ToString());
                 insertCommand.Parameters.AddWithValue("@Status", node.Status.ToString());
 
                 generatedId = (long)(await insertCommand.ExecuteScalarAsync(cancellationToken))!;
@@ -219,7 +218,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
     public async Task<CanonicalTaxonomyNode?> GetByIdAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status
+            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status
             FROM Catalog.CanonicalTaxonomyNodes
             WHERE CanonicalTaxonomyNodeId = @CanonicalTaxonomyNodeId
             """;
@@ -241,7 +240,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status, Revision
+            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status, Revision
             FROM Catalog.CanonicalTaxonomyNodes
             WHERE CanonicalTaxonomyNodeId = @CanonicalTaxonomyNodeId
             """;
@@ -256,7 +255,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         if (!await reader.ReadAsync(cancellationToken)) return null;
 
         var node = ReadNode(reader);
-        var revision = reader.GetInt64(11);
+        var revision = reader.GetInt64(9);
 
         return (node, revision);
     }
@@ -264,7 +263,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
     public async Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetChildrenAsync(CanonicalTaxonomyNodeId parentId, CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status
+            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status
             FROM Catalog.CanonicalTaxonomyNodes
             WHERE ParentId = @ParentId
             ORDER BY Code
@@ -291,7 +290,7 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
     public async Task<IReadOnlyCollection<CanonicalTaxonomyNode>> GetRootsAsync(CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status
+            SELECT CanonicalTaxonomyNodeId, ParentId, Code, Name, NormalizedName, Description, Depth, Path, Status
             FROM Catalog.CanonicalTaxonomyNodes
             WHERE ParentId IS NULL
             ORDER BY Path, CanonicalTaxonomyNodeId
@@ -341,11 +340,9 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
         var description = reader.IsDBNull(5) ? null : reader.GetString(5);
         var depth = reader.GetInt16(6);
         var path = reader.GetString(7);
-        var googleCategoryId = reader.IsDBNull(8) ? (long?)null : reader.GetInt64(8);
-        var source = Enum.Parse<CanonicalTaxonomySource>(reader.GetString(9));
-        var status = Enum.Parse<CanonicalTaxonomyNodeStatus>(reader.GetString(10));
+        var status = Enum.Parse<CanonicalTaxonomyNodeStatus>(reader.GetString(8));
 
         return CanonicalTaxonomyNode.Hydrate(
-            id, parentId, googleCategoryId, code, name, normalizedName, description, depth, path, source, status);
+            id, parentId, code, name, normalizedName, description, depth, path, status);
     }
 }
