@@ -74,8 +74,6 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         Assert.Equal(sapatos.Depth, updated.Depth);
         Assert.Equal(sapatos.ParentId, updated.ParentId);
         Assert.Equal(sapatos.Code, updated.Code);
-        Assert.Equal(sapatos.GoogleCategoryId, updated.GoogleCategoryId);
-        Assert.Equal(sapatos.Source, updated.Source);
         Assert.Equal(sapatos.Status, updated.Status);
     }
 

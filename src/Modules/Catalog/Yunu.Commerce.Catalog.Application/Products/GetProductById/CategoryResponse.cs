@@ -14,6 +14,4 @@ public sealed class CategoryResponse
     public required string Name { get; init; }
 
     public required string Path { get; init; }
-
-    public required string Source { get; init; }
 }

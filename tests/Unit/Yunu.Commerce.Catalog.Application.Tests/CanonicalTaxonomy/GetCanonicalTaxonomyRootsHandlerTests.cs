@@ -13,7 +13,7 @@ public class GetCanonicalTaxonomyRootsHandlerTests
 
         var root = CanonicalTaxonomyNode.CreateRoot(
             new CanonicalTaxonomyNodeId(1), "cat", "Catálogo", "catalogo", null, "Catálogo",
-            googleCategoryId: null, source: CanonicalTaxonomySource.Yunu, status: CanonicalTaxonomyNodeStatus.Active);
+            status: CanonicalTaxonomyNodeStatus.Active);
         await repo.AddAsync(root, CancellationToken.None);
 
         var child = CanonicalTaxonomyNode.CreateChild(
@@ -50,22 +50,20 @@ public class GetCanonicalTaxonomyRootsHandlerTests
     }
 
     [Fact]
-    public async Task Handle_Should_Map_GoogleCategoryId_Path_Source_And_Status()
+    public async Task Handle_Should_Map_Path_And_Status()
     {
         var repo = new FakeCanonicalTaxonomyRepository();
 
         var root = CanonicalTaxonomyNode.CreateRoot(
             new CanonicalTaxonomyNodeId(1), "cat", "Catálogo", "catalogo", null, "Catálogo",
-            googleCategoryId: 123, source: CanonicalTaxonomySource.Google, status: CanonicalTaxonomyNodeStatus.Active);
+            status: CanonicalTaxonomyNodeStatus.Active);
         await repo.AddAsync(root, CancellationToken.None);
 
         var handler = new GetCanonicalTaxonomyRootsHandler(repo);
         var result = await handler.HandleAsync(new GetCanonicalTaxonomyRootsQuery(), CancellationToken.None);
 
         var response = Assert.Single(result);
-        Assert.Equal(123, response.GoogleCategoryId);
         Assert.Equal("Catálogo", response.Path);
-        Assert.Equal("Google", response.Source);
         Assert.Equal("Active", response.Status);
     }
 

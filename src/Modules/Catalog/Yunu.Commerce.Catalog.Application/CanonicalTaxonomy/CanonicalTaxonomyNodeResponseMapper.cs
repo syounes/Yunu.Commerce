@@ -16,13 +16,11 @@ internal static class CanonicalTaxonomyNodeResponseMapper
         {
             CanonicalTaxonomyNodeId = node.Id.Value,
             ParentId = node.ParentId?.Value,
-            GoogleCategoryId = node.GoogleCategoryId,
             Code = node.Code,
             Name = node.Name,
             Description = node.Description,
             Depth = node.Depth,
             Path = node.Path,
-            Source = node.Source.ToString(),
             Status = node.Status.ToString()
         };
     }
