@@ -14,6 +14,7 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Application.SegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
+using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.ProductProposals;
@@ -37,6 +38,7 @@ using Yunu.Commerce.Catalog.Infrastructure.SegmentCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.Synchronization.InMemory;
+using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;
 
@@ -114,6 +116,11 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<ISegmentEmbeddingRepository, PostgreSqlSegmentEmbeddingRepository>();
         services.Configure<SegmentEmbeddingsSyncOptions>(configuration.GetSection("Catalog:SegmentEmbeddings"));
         services.AddSingleton<ISegmentEmbeddingSynchronizationGuard, InMemorySegmentEmbeddingSynchronizationGuard>();
+
+        // SourceTaxonomy is provider-neutral imported/reference data (docs/adr/0014).
+        // Reuses the existing shared Catalog SQL connection source (GoogleTaxonomySqlOptions)
+        // rather than introducing a second SQL connection string/config section.
+        services.AddSingleton<ISourceTaxonomyRepository, SqlSourceTaxonomyRepository>();
 
         return services;
     }

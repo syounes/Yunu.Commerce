@@ -231,6 +231,29 @@ BEGIN TRY
             ON Catalog.SourceTaxonomyNodes (SourceTaxonomyId, IsActive)
             INCLUDE (ExternalNodeId, Name, NodeType, Level);
 
+    /* Pre-flight Phase 2 hardening: the approved SourceTaxonomy Evolution
+       Plan requires provider-neutral node indexes on (SourceTaxonomyId, Level)
+       and (SourceTaxonomyId, Name) in addition to the Parent/IsActive indexes
+       already created above. These were omitted from the initial migration
+       and are added here idempotently before migration 014 reaches main. */
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'Catalog.SourceTaxonomyNodes')
+          AND name = N'IX_SourceTaxonomyNodes_SourceTaxonomyId_Level'
+    )
+        CREATE INDEX IX_SourceTaxonomyNodes_SourceTaxonomyId_Level
+            ON Catalog.SourceTaxonomyNodes (SourceTaxonomyId, Level);
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'Catalog.SourceTaxonomyNodes')
+          AND name = N'IX_SourceTaxonomyNodes_SourceTaxonomyId_Name'
+    )
+        CREATE INDEX IX_SourceTaxonomyNodes_SourceTaxonomyId_Name
+            ON Catalog.SourceTaxonomyNodes (SourceTaxonomyId, Name);
+
     /* ================================================================
        Integration.SourceTaxonomyImports
        Generic SourceTaxonomy import history.
@@ -424,6 +447,22 @@ BEGIN TRY
         )
     )
         THROW 51104, 'A provider-specific or CanonicalTaxonomy-coupled column was unexpectedly found on a SourceTaxonomy table.', 1;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'Catalog.SourceTaxonomyNodes')
+          AND name = N'IX_SourceTaxonomyNodes_SourceTaxonomyId_Level'
+    )
+        THROW 51105, 'Catalog.SourceTaxonomyNodes IX_SourceTaxonomyNodes_SourceTaxonomyId_Level index is missing.', 1;
+
+    IF NOT EXISTS
+    (
+        SELECT 1 FROM sys.indexes
+        WHERE object_id = OBJECT_ID(N'Catalog.SourceTaxonomyNodes')
+          AND name = N'IX_SourceTaxonomyNodes_SourceTaxonomyId_Name'
+    )
+        THROW 51106, 'Catalog.SourceTaxonomyNodes IX_SourceTaxonomyNodes_SourceTaxonomyId_Name index is missing.', 1;
 
     COMMIT TRANSACTION;
 END TRY
