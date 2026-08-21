@@ -48,12 +48,14 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var vestuario = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), rootId, "vestuario", "Vestuário e acessórios", "vestuario e acessorios",
             null, 1, "Catálogo > Vestuário e acessórios", status: CanonicalTaxonomyNodeStatus.Active);
-        var vestuarioId = await repo.AddAsync(vestuario, CancellationToken.None);
+        var vestuarioResult = await repo.AddChildAsync(vestuario, repo.GetRevisionForTest(rootId), CancellationToken.None);
+        var vestuarioId = vestuarioResult.AssignedId!.Value;
 
         var sapatos = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), vestuarioId, "sapatos", "Sapatos", "sapatos",
             null, 2, "Catálogo > Vestuário e acessórios > Sapatos", status: CanonicalTaxonomyNodeStatus.Active);
-        var sapatosId = await repo.AddAsync(sapatos, CancellationToken.None);
+        var sapatosResult = await repo.AddChildAsync(sapatos, repo.GetRevisionForTest(vestuarioId), CancellationToken.None);
+        var sapatosId = sapatosResult.AssignedId!.Value;
 
         var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
@@ -91,7 +93,7 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), rootId, "child", "Child", "child",
             null, 1, "Catálogo > Child", status: CanonicalTaxonomyNodeStatus.Active);
-        await repo.AddAsync(child, CancellationToken.None);
+        await repo.AddChildAsync(child, repo.GetRevisionForTest(rootId), CancellationToken.None);
 
         var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
         var command = new UpdateCanonicalTaxonomyNodeCommand
@@ -141,7 +143,8 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), rootId, "child", "Child", "child",
             null, 1, "Catálogo > Child", status: CanonicalTaxonomyNodeStatus.Active);
-        var childId = await repo.AddAsync(child, CancellationToken.None);
+        var childResult = await repo.AddChildAsync(child, repo.GetRevisionForTest(rootId), CancellationToken.None);
+        var childId = childResult.AssignedId!.Value;
 
         // Simulate an inconsistent tree: remove the parent while the child still references it.
         repo.RemoveForTest(rootId);

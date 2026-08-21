@@ -23,6 +23,11 @@ public sealed class SqlCanonicalTaxonomyRepository : ICanonicalTaxonomyRepositor
 
     public async Task<CanonicalTaxonomyNodeId> AddAsync(CanonicalTaxonomyNode node, CancellationToken cancellationToken)
     {
+        if (node.ParentId is not null)
+        {
+            throw new ArgumentException("AddAsync is for root nodes only; use AddChildAsync for a node with a ParentId.", nameof(node));
+        }
+
         const string sql = """
             INSERT INTO Catalog.CanonicalTaxonomyNodes
                 (ParentId, Code, Name, NormalizedName, Description, Depth, Path, GoogleCategoryId, Source, Status)

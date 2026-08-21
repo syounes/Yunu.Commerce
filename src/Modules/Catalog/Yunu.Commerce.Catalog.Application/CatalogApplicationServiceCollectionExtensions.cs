@@ -26,6 +26,7 @@ using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.EffectiveSegmentDefini
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyChildren;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyNodeById;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.GetCanonicalTaxonomyRoots;
+using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.RootTopology;
 using Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.UpdateCanonicalTaxonomyNode;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Application.SegmentCatalog.GetSegmentDefinitionByCode;
@@ -73,6 +74,13 @@ public static class CatalogApplicationServiceCollectionExtensions
         services.AddScoped<GetCanonicalTaxonomyRootsHandler>();
         services.AddScoped<UpdateCanonicalTaxonomyNodeHandler>();
         services.AddScoped<GetEffectiveSegmentDefinitionsHandler>();
+
+        services.AddOptions<CanonicalTaxonomyRootPolicyOptions>()
+            .Bind(configuration.GetSection("Catalog:CanonicalTaxonomy:RootTopology"))
+            .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<CanonicalTaxonomyRootPolicyOptions>, CanonicalTaxonomyRootPolicyOptionsValidator>();
+        services.AddScoped<ICanonicalTaxonomyRootTopologyAuditor, CanonicalTaxonomyRootTopologyAuditor>();
 
         services.AddScoped<GetSegmentDefinitionsHandler>();
         services.AddScoped<GetSegmentDefinitionByIdHandler>();
