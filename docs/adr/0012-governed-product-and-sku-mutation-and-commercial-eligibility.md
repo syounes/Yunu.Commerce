@@ -1,7 +1,7 @@
 ﻿# ADR-0012: Governed Product and Sku Mutation and Commercial Eligibility
 
 - **Status:** Accepted
-- **Date:** 2026-09-10
+- **Date:** 2025-06-12
 - **Decision Owners:** Yunu.Commerce Architecture
 - **Scope:** Catalog Bounded Context — `Product`, `Sku`
 
@@ -40,11 +40,12 @@ Inactive -> Active | Archived
 Archived -> (terminal)
 ```
 
-`SkuStatus` keeps the same shape, with `Draft` additionally allowed to move
-directly to `Inactive`:
+`SkuStatus` keeps the same shape as `ProductStatus`; a Draft Sku has never
+been operational, so it is never "deactivated" (`Draft -> Inactive` does not
+exist):
 
 ```
-Draft -> Active | Inactive | Archived
+Draft -> Active | Archived
 Active -> Inactive | Archived
 Inactive -> Active | Archived
 Archived -> (terminal)
@@ -104,24 +105,82 @@ services, intended for the governed ProductProposal conversion flow (not
 implemented by this ADR), consistent with the structural-data governance
 model in docs/adr/0011.
 
-Two new semantic lifecycle endpoints are added instead of generic
-mutation/update endpoints:
+Instead of generic mutation/update or a single generic "set Status to X"
+endpoint, semantic lifecycle commands are exposed per Aggregate so HTTP can
+never send an arbitrary target Status:
 
-- `POST /api/catalog/products/{productId}/status` — body `{ "status": "..." }`.
-- `POST /api/catalog/skus/{skuId}/status` — body `{ "status": "..." }`.
+- `POST /api/catalog/products/{productId}/deactivate` — Active -> Inactive.
+- `POST /api/catalog/products/{productId}/reactivate` — Inactive -> Active.
+- `POST /api/catalog/products/{productId}/archive` — any non-terminal state -> Archived.
+- `POST /api/catalog/skus/{skuId}/deactivate` — Active -> Inactive.
+- `POST /api/catalog/skus/{skuId}/reactivate` — Inactive -> Active.
+- `POST /api/catalog/skus/{skuId}/archive` — any non-terminal state -> Archived.
 
 No `PUT`/`PATCH` structural-mutation endpoint is introduced for either
-Aggregate.
+Aggregate. The initial `Draft -> Active` transition is intentionally **not**
+exposed by any public endpoint for either Aggregate: it remains
+internal/governed, reserved for the (not-yet-implemented) ProductProposal
+materialization flow. "Reactivate" therefore only ever means
+`Inactive -> Active`, never `Draft -> Active`.
 
 ### 2.5 Concurrency
 
-`IProductRepository.UpdateStatusAsync` and `ISkuRepository.UpdateStatusAsync`
-apply an atomic, conditional MongoDB update
-(`{ Id, Status = expectedCurrentStatus } -> Set(Status = newStatus)`),
-returning `false` when no document matched (already-changed or missing).
-`TransitionProductStatusHandler`/`TransitionSkuStatusHandler` reload the
-Aggregate and retry (bounded, 3 attempts) on a `false` result, avoiding a
-lost-update race without introducing a distributed lock or a version field.
+Product and Sku remain independent Aggregate Roots, each with its own
+repository (docs/adr/0010-separate-product-and-sku-aggregate-boundaries.md);
+this decision does not merge them into one Aggregate and does not establish
+a general transactional boundary between them. A narrow
+`IProductSkuConcurrencyCoordinator` port
+(`Catalog.Domain.Concurrency`) exists exclusively to atomically enforce the
+one invariant that spans both Aggregates:
+
+```
+Product.Status == Archived
+    =>
+no Sku belonging to that Product has a Status other than Archived.
+```
+
+Without coordination, "read Skus, then write Product" (Archive) and "read
+Product, then write Sku" (CreateSku / reactivate / block) can each pass their
+own guard check against a state that changes before the other operation
+commits (write skew). `MongoProductSkuConcurrencyCoordinator` is the MongoDB
+adapter for this port. For each of the three operations it protects
+(`ArchiveProductAsync`, `CreateSkuIfProductNotArchivedAsync`,
+`TransitionSkuIfProductNotArchivedAsync`), it opens a single MongoDB
+multi-document transaction (`session.WithTransactionAsync`) and, inside that
+transaction, conditionally increments the same field on the same Product
+document: `ProductDocument.LifecycleRevision`, an infrastructure-only token
+never mapped onto the Domain `Product` Aggregate. Because every competing
+operation must touch this same field on the same document before writing its
+own Aggregate, MongoDB allows only one of two concurrently racing
+transactions to commit; the loser's conditional update matches zero
+documents and the operation returns a normal coordination result
+(`ConcurrencyConflict`, `ProductArchived`, or `NonArchivedSkuExists`)
+instead of silently interleaving. `TransitionProductStatusHandler` and
+`TransitionSkuStatusHandler` translate a losing result directly into an
+exception (first-writer-wins); neither handler reloads the Aggregate and
+retries the original command against newer state.
+
+This is a conditional-write coordination mechanism scoped to one
+cross-aggregate invariant, not a distributed lock. No application-level
+command retry loop exists; the only retry behavior involved is MongoDB
+driver's own built-in transient-transaction-error retry inside
+`WithTransactionAsync` for the underlying "WriteConflict" case, which is
+transparent to callers of this port.
+
+Because standalone (non-replica-set) MongoDB does not support multi-document
+transactions, this design requires MongoDB configured as a replica set — a
+single-node replica set is sufficient for local/dev/test
+(deploy/docker/docker-compose.yml documents and health-checks this
+requirement).
+
+Non-Archive Product transitions and Sku transitions *to* `Archived` have no
+cross-aggregate concern (an Archived Product's Skus may still individually
+become Archived) and are persisted directly through
+`IProductRepository.UpdateStatusAsync` / `ISkuRepository.UpdateStatusAsync`,
+an atomic conditional update (`{ Id, Status = expectedCurrentStatus } ->
+Set(Status = newStatus)`) that still returns `false` — surfaced as a
+concurrency-conflict exception, not retried — when another writer already
+changed the document.
 
 ## 3. Consequences
 
@@ -129,19 +188,24 @@ lost-update race without introducing a distributed lock or a version field.
 
 - A single, explicit, testable state machine per Aggregate replaces ad hoc
   status assignment.
-- Cross-aggregate rules are visible in Application handlers, not hidden
-  inside either Aggregate, preserving Aggregate independence.
+- Cross-aggregate rules are visible in Application handlers and the
+  coordinator port, not hidden inside either Aggregate, preserving Aggregate
+  independence (docs/adr/0010 unchanged).
 - Commercial Eligibility has one authoritative definition and is guaranteed
   never to drift into persisted state.
 - Public API surface for Product/Sku mutation is minimal and semantic
-  (`.../status`), consistent with docs/adr/0011's read-only/governed-mutation
-  philosophy.
+  (deactivate/reactivate/archive), consistent with docs/adr/0011's
+  read-only/governed-mutation philosophy.
+- The `LifecycleRevision`-based transactional coordination gives the
+  cross-aggregate invariant a genuine common write point, closing the write
+  skew that a purely optimistic per-document conditional update cannot
+  prevent on its own.
 
 **Trade-offs:**
 
-- The bounded retry loop on `UpdateStatusAsync` is a pragmatic optimistic-
-  concurrency strategy; it does not fully eliminate the race under very high
-  contention (acceptable at this phase; no distributed lock is introduced).
+- The coordinator requires MongoDB configured as a replica set (even a
+  single-node one) in every environment, including local/dev/test, because
+  standalone MongoDB does not support the transactions it relies on.
 - `ProductProposal` → `Product`/`Sku` conversion (the intended caller of
   `CreateProductHandler`/`CreateSkuHandler`) is out of scope for this ADR and
   remains a follow-up.
