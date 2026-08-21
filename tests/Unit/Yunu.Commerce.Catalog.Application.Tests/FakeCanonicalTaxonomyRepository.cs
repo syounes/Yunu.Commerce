@@ -30,6 +30,11 @@ internal sealed class FakeCanonicalTaxonomyRepository : ICanonicalTaxonomyReposi
 
     public Task<CanonicalTaxonomyNodeId> AddAsync(CanonicalTaxonomyNode node, CancellationToken cancellationToken)
     {
+        if (node.ParentId is not null)
+        {
+            throw new ArgumentException("AddAsync is for root nodes only; use AddChildAsync for a node with a ParentId.", nameof(node));
+        }
+
         var id = node.Id.Value == 0 ? _nextId++ : node.Id.Value;
         var stored = Rehydrate(id, node);
         _nodes[id] = stored;

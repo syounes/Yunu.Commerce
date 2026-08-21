@@ -19,7 +19,7 @@ public class GetCanonicalTaxonomyRootsHandlerTests
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(2), new CanonicalTaxonomyNodeId(1), "child", "Child", "child",
             null, 1, "Catálogo > Child", status: CanonicalTaxonomyNodeStatus.Active);
-        await repo.AddAsync(child, CancellationToken.None);
+        repo.Add(2, child);
 
         var handler = new GetCanonicalTaxonomyRootsHandler(repo);
         var result = await handler.HandleAsync(new GetCanonicalTaxonomyRootsQuery(), CancellationToken.None);
@@ -41,7 +41,7 @@ public class GetCanonicalTaxonomyRootsHandlerTests
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(2), new CanonicalTaxonomyNodeId(1), "child", "Child", "child",
             null, 1, "Catálogo > Child", status: CanonicalTaxonomyNodeStatus.Active);
-        await repo.AddAsync(child, CancellationToken.None);
+        repo.Add(2, child);
 
         var handler = new GetCanonicalTaxonomyRootsHandler(repo);
         var result = await handler.HandleAsync(new GetCanonicalTaxonomyRootsQuery(), CancellationToken.None);

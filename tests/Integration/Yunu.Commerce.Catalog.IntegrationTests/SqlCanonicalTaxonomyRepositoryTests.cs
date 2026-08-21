@@ -107,6 +107,21 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
             $"Name {code}",
             status: CanonicalTaxonomyNodeStatus.Active);
 
+    /// <summary>
+    /// Test-only helper that persists <paramref name="child"/> through the
+    /// only legitimate child-creation path, <see cref="ICanonicalTaxonomyRepository.AddChildAsync"/>,
+    /// reloading <paramref name="parentId"/>'s current Revision immediately
+    /// before the call so callers never reuse a stale Revision when creating
+    /// multiple children under the same parent.
+    /// </summary>
+    private async Task<CanonicalTaxonomyNodeId> AddChildForTestAsync(CanonicalTaxonomyNode child, CanonicalTaxonomyNodeId parentId)
+    {
+        var (_, parentRevision) = (await _repository.GetWithRevisionAsync(parentId, CancellationToken.None))!.Value;
+        var result = await _repository.AddChildAsync(child, parentRevision, CancellationToken.None);
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.Created, result.Outcome);
+        return result.AssignedId!.Value;
+    }
+
     [Fact]
     public async Task AddAsync_Should_Insert_Node_And_Return_Generated_Id()
     {
@@ -142,17 +157,17 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var child1 = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), parentId, "child-1", "Child 1", "child 1", null, 1, "Name parent-1 > Child 1",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var childId1 = await _repository.AddAsync(child1, CancellationToken.None);
+        var childId1 = await AddChildForTestAsync(child1, parentId);
 
         var child2 = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), parentId, "child-2", "Child 2", "child 2", null, 1, "Name parent-1 > Child 2",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var childId2 = await _repository.AddAsync(child2, CancellationToken.None);
+        var childId2 = await AddChildForTestAsync(child2, parentId);
 
         var otherChild = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), otherParentId, "other-child", "Other Child", "other child", null, 1, "Name other-parent-1 > Other Child",
             status: CanonicalTaxonomyNodeStatus.Active);
-        await _repository.AddAsync(otherChild, CancellationToken.None);
+        await AddChildForTestAsync(otherChild, otherParentId);
 
         var children = await _repository.GetChildrenAsync(parentId, CancellationToken.None);
 
@@ -170,7 +185,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), parentId, "has-children-child", "Child", "child", null, 1, "Name has-children-parent > Child",
             status: CanonicalTaxonomyNodeStatus.Active);
-        await _repository.AddAsync(child, CancellationToken.None);
+        await AddChildForTestAsync(child, parentId);
 
         var hasChildren = await _repository.HasChildrenAsync(parentId, CancellationToken.None);
 
@@ -399,7 +414,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
             1,
             "Catálogo Teste Pai > Vestuário e acessórios",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var childId = await _repository.AddAsync(child, CancellationToken.None);
+        var childId = await AddChildForTestAsync(child, parentId);
 
         var persistedChild = await _repository.GetByIdAsync(childId, CancellationToken.None);
 
@@ -430,7 +445,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
             1,
             "Catálogo Teste Avô > Vestuário e acessórios",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var apparelId = await _repository.AddAsync(apparel, CancellationToken.None);
+        var apparelId = await AddChildForTestAsync(apparel, rootId);
 
         var shoes = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0),
@@ -442,7 +457,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
             2,
             "Catálogo Teste Avô > Vestuário e acessórios > Sapatos",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var shoesId = await _repository.AddAsync(shoes, CancellationToken.None);
+        var shoesId = await AddChildForTestAsync(shoes, apparelId);
 
         var persistedShoes = await _repository.GetByIdAsync(shoesId, CancellationToken.None);
 
@@ -496,12 +511,40 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var child = CanonicalTaxonomyNode.CreateChild(
             new CanonicalTaxonomyNodeId(0), rootId, "get-roots-child", "Child", "child", null, 1, "Name get-roots-parent > Child",
             status: CanonicalTaxonomyNodeStatus.Active);
-        var childId = await _repository.AddAsync(child, CancellationToken.None);
+        var childId = await AddChildForTestAsync(child, rootId);
 
         var roots = await _repository.GetRootsAsync(CancellationToken.None);
 
         Assert.Contains(roots, r => r.Id == rootId);
         Assert.DoesNotContain(roots, r => r.Id == childId);
         Assert.All(roots, r => Assert.Null(r.ParentId));
+    }
+
+    [Fact]
+    public async Task AddAsync_With_Root_Node_Should_Still_Succeed()
+    {
+        var node = CreateRootNode("addasync-root-guard");
+
+        var id = await _repository.AddAsync(node, CancellationToken.None);
+
+        var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
+        Assert.NotNull(persisted);
+        Assert.Null(persisted!.ParentId);
+    }
+
+    [Fact]
+    public async Task AddAsync_With_Child_Node_Should_Be_Rejected_And_Not_Persist()
+    {
+        var parent = CreateRootNode("addasync-child-guard-parent");
+        var parentId = await _repository.AddAsync(parent, CancellationToken.None);
+
+        var child = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "addasync-child-guard-child", "Child", "child",
+            null, 1, "Name addasync-child-guard-parent > Child", status: CanonicalTaxonomyNodeStatus.Active);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _repository.AddAsync(child, CancellationToken.None));
+
+        var hasChildren = await _repository.HasChildrenAsync(parentId, CancellationToken.None);
+        Assert.False(hasChildren);
     }
 }

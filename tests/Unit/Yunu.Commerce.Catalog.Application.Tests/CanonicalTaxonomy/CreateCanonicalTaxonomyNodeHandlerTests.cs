@@ -125,4 +125,40 @@ public class CreateCanonicalTaxonomyNodeHandlerTests
         var hasChildren = await repo.HasChildrenAsync(rootId, CancellationToken.None);
         Assert.True(hasChildren);
     }
+
+    [Fact]
+    public async Task AddAsync_With_Root_Node_Still_Succeeds()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Active);
+
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var persisted = await repo.GetByIdAsync(rootId, CancellationToken.None);
+        Assert.NotNull(persisted);
+        Assert.Null(persisted!.ParentId);
+    }
+
+    [Fact]
+    public async Task AddAsync_With_Child_Node_Is_Rejected_And_Does_Not_Persist()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var child = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), rootId, "child", "Filho", "filho", null, 1, "Catálogo > Filho",
+            status: CanonicalTaxonomyNodeStatus.Active);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => repo.AddAsync(child, CancellationToken.None));
+
+        var hasChildren = await repo.HasChildrenAsync(rootId, CancellationToken.None);
+        Assert.False(hasChildren);
+    }
 }
