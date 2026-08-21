@@ -1,5 +1,4 @@
-﻿using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
-using Yunu.Commerce.SharedKernel;
+﻿using Yunu.Commerce.SharedKernel;
 
 namespace Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 
@@ -12,6 +11,21 @@ namespace Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 public sealed class InvalidCanonicalTaxonomyNodeStatusTransitionException : Exception
 {
     public InvalidCanonicalTaxonomyNodeStatusTransitionException(string message) : base(message)
+    {
+    }
+}
+
+/// <summary>
+/// Thrown when <see cref="CanonicalTaxonomyNode.Update"/> is attempted on a
+/// node whose Status is <see cref="CanonicalTaxonomyNodeStatus.Archived"/>
+/// (docs task: "Yunu.Commerce - Pre-AI Foundation Freeze" - Archived is a
+/// terminal lifecycle state and must also be immutable for structural/
+/// descriptive fields), mirroring
+/// <see cref="Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinitionStructuralChangeNotAllowedException"/>.
+/// </summary>
+public sealed class CanonicalTaxonomyNodeArchivedException : Exception
+{
+    public CanonicalTaxonomyNodeArchivedException(string message) : base(message)
     {
     }
 }
@@ -208,9 +222,20 @@ public sealed class CanonicalTaxonomyNode
     /// visibility into children or Products. Path is computed by the
     /// Application layer from the parent's current Path (or from the new
     /// name alone for a root node) and is only validated/persisted here.
+    /// Archived is a terminal lifecycle state (docs task: "Yunu.Commerce -
+    /// Pre-AI Foundation Freeze"): once a node is Archived it can no longer
+    /// be renamed/updated and this method throws
+    /// <see cref="CanonicalTaxonomyNodeArchivedException"/> before any field
+    /// is mutated or event raised.
     /// </summary>
     public void Update(string name, string normalizedName, string? description, string path)
     {
+        if (Status == CanonicalTaxonomyNodeStatus.Archived)
+        {
+            throw new CanonicalTaxonomyNodeArchivedException(
+                $"Canonical Taxonomy node '{Id}' is Archived and cannot be updated.");
+        }
+
         if (string.IsNullOrWhiteSpace(name))
         {
             throw new ArgumentException("Name cannot be null, empty or whitespace.", nameof(name));

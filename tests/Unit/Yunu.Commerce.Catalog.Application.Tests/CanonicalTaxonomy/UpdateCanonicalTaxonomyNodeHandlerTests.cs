@@ -189,4 +189,30 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         var reloaded = await repo.GetByIdAsync(rootId, CancellationToken.None);
         Assert.Equal("Catálogo", reloaded!.Name);
     }
+
+    [Fact]
+    public async Task Update_archived_node_throws_and_does_not_persist_changes()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+        var productRepo = new FakeProductRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Archived);
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
+        var command = new UpdateCanonicalTaxonomyNodeCommand
+        {
+            CanonicalTaxonomyNodeId = rootId.Value,
+            Name = "Novo nome",
+            Description = null
+        };
+
+        await Assert.ThrowsAsync<CanonicalTaxonomyNodeArchivedException>(
+            () => handler.HandleAsync(command, CancellationToken.None));
+
+        var reloaded = await repo.GetByIdAsync(rootId, CancellationToken.None);
+        Assert.Equal("Catálogo", reloaded!.Name);
+    }
 }
