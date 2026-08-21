@@ -14,12 +14,12 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// <see cref="MongoProductSkuConcurrencyCoordinator"/> uses
 /// <c>session.WithTransactionAsync</c>, which requires MongoDB
 /// multi-document transactions; a standalone (non-replica-set) mongod does
-/// not support them. This fixture mirrors the single-node replica-set
-/// requirement already documented for local/dev Docker
-/// (deploy/docker/docker-compose.yml): it starts the container with
-/// <c>--replSet rs0</c>, deterministically initiates the replica set via
-/// <c>mongosh</c> and then polls the real server state (no arbitrary sleeps)
-/// until it reports a writable PRIMARY, i.e. transaction-ready.
+/// not support them. This fixture uses the Testcontainers.MongoDb module's
+/// own supported replica-set configuration (<c>WithReplicaSet</c>), which
+/// handles container startup, replica-set initiation and connection-string
+/// construction; this fixture only adds a deterministic readiness check that
+/// polls the real server state (no arbitrary sleeps) until it reports a
+/// writable PRIMARY, i.e. transaction-ready, before any test runs.
 ///
 /// Shared via <see cref="ICollectionFixture{TFixture}"/> across the
 /// concurrency test class: starting a replica-set container is comparatively
@@ -29,11 +29,8 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// </summary>
 public sealed class MongoReplicaSetFixture : IAsyncLifetime
 {
-    private const string ReplicaSetName = "rs0";
-    private const int MongoPort = 27017;
-
     private readonly MongoDbContainer _container = new MongoDbBuilder("mongo:7.0.14")
-        .WithCommand("--replSet", ReplicaSetName, "--bind_ip_all")
+        .WithReplicaSet()
         .Build();
 
     public IMongoClient MongoClient { get; private set; } = null!;
@@ -48,12 +45,7 @@ public sealed class MongoReplicaSetFixture : IAsyncLifetime
     {
         await _container.StartAsync();
 
-        var host = _container.Hostname;
-        var mappedPort = _container.GetMappedPublicPort(MongoPort);
-
-        await InitiateReplicaSetAsync(host, mappedPort);
-
-        var connectionString = $"mongodb://{host}:{mappedPort}/?replicaSet={ReplicaSetName}";
+        var connectionString = _container.GetConnectionString();
         MongoClient = new MongoClient(connectionString);
 
         await WaitUntilWritablePrimaryAsync(MongoClient);
@@ -72,27 +64,6 @@ public sealed class MongoReplicaSetFixture : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _container.DisposeAsync();
-    }
-
-    /// <summary>
-    /// Deterministically initiates the single-node replica set. The member
-    /// host is advertised as the same host:port the test process itself uses
-    /// to connect (Testcontainers' mapped public port), so subsequent
-    /// server-discovery/topology monitoring performed by the .NET driver from
-    /// outside the container resolves to a reachable address.
-    /// </summary>
-    private async Task InitiateReplicaSetAsync(string host, int mappedPort)
-    {
-        var initiateEval =
-            $"rs.initiate({{_id:'{ReplicaSetName}',members:[{{_id:0,host:'{host}:{mappedPort}'}}]}})";
-
-        var result = await _container.ExecAsync(new[] { "mongosh", "--quiet", "--eval", initiateEval });
-
-        if (result.ExitCode != 0 && !result.Stdout.Contains("already initialized", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException(
-                $"Failed to initiate MongoDB replica set '{ReplicaSetName}'. Exit code: {result.ExitCode}. Stdout: {result.Stdout}. Stderr: {result.Stderr}.");
-        }
     }
 
     /// <summary>

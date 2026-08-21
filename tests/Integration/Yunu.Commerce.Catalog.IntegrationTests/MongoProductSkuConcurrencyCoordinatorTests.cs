@@ -22,6 +22,18 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 ///         =&gt;
 ///     no Sku belonging to that Product has a Status other than Archived.
 ///
+/// Test classification:
+/// - Genuine concurrency races (both operations can independently observe a
+///   valid precondition and race toward the forbidden final state):
+///   Scenario A (Archive vs CreateSku) and Scenario G (two concurrent
+///   Archive attempts racing on LifecycleRevision).
+/// - Deterministic guards (the outcome cannot depend on timing because one
+///   side's precondition check already fails regardless of interleaving):
+///   Scenarios B/C/D/E/F. A Sku that already exists and is non-Archived
+///   before ArchiveProductAsync's own check runs guarantees
+///   NonArchivedSkuExists; these are kept as integration coverage of the
+///   guards themselves, not as concurrency proofs.
+///
 /// Concurrency is driven with real overlapping `Task`s racing against the
 /// same underlying documents; a <see cref="Barrier"/> is used to align both
 /// operations at the same starting instant so they genuinely contend for the
@@ -135,48 +147,44 @@ public sealed class MongoProductSkuConcurrencyCoordinatorTests
     }
 
     /// <summary>
-    /// Scenario B — Product Archive vs concurrent Sku reactivation
-    /// (Inactive -&gt; Active).
+    /// Scenario B (guard, not a race) — Archiving a Product that already has
+    /// an Inactive Sku must be rejected deterministically. Unlike Scenario A
+    /// (CreateSku), the Sku already exists before ArchiveProductAsync's own
+    /// non-Archived-Sku check runs, so this can never be a genuine write-skew
+    /// race: NonArchivedSkuExists is guaranteed to be observed regardless of
+    /// timing. Kept as an integration test of the guard itself, not
+    /// classified as a concurrency scenario.
     /// </summary>
     [Fact]
-    public async Task ArchiveProduct_Concurrent_With_ReactivateSku_Should_Never_Violate_Invariant()
+    public async Task ArchiveProduct_With_Existing_Inactive_Sku_Should_Be_Rejected()
     {
         var product = await SeedProductAsync(ProductStatus.Active);
         var sku = await SeedSkuAsync(product.Id, SkuStatus.Inactive);
 
-        var (archiveResult, transitionResult) = await RunConcurrentlyAsync(
-            async barrier =>
-            {
-                barrier.SignalAndWait();
-                return await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
-            },
-            async barrier =>
-            {
-                barrier.SignalAndWait();
-                return await _fixture.Coordinator.TransitionSkuIfProductNotArchivedAsync(
-                    sku.Id, SkuStatus.Inactive, SkuStatus.Active, CancellationToken.None);
-            });
+        var archiveResult = await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
 
-        Assert.Contains(archiveResult, new[] { ArchiveProductCoordinationResult.Archived, ArchiveProductCoordinationResult.NonArchivedSkuExists, ArchiveProductCoordinationResult.ConcurrencyConflict });
-        Assert.Contains(transitionResult, new[] { SkuTransitionCoordinationResult.Transitioned, SkuTransitionCoordinationResult.ProductArchived });
+        Assert.Equal(ArchiveProductCoordinationResult.NonArchivedSkuExists, archiveResult);
 
         var state = await ReadPersistedStateAsync(product.Id, sku.Id);
         Assert.NotNull(state.Product);
         Assert.NotNull(state.Sku);
-
-        Assert.False(
-            state.Product!.Status == ProductStatus.Archived && state.Sku!.Status == SkuStatus.Active,
-            "Invariant violated: Product is Archived but Sku is Active.");
+        Assert.Equal(ProductStatus.Active, state.Product!.Status);
+        Assert.Equal(SkuStatus.Inactive, state.Sku!.Status);
     }
 
     /// <summary>
-    /// Scenario C — Product Archive vs concurrent Sku transition to Inactive
-    /// (Active -&gt; Inactive). Even though the resulting Sku status
-    /// (Inactive) is itself non-Archived, the same cross-aggregate invariant
-    /// must hold for the persisted final state.
+    /// Scenario C (guard, not a race) — Archiving a Product that already has
+    /// an Active Sku must be rejected deterministically, and a concurrent
+    /// Active -&gt; Inactive Sku transition does not change that outcome: the
+    /// Sku is already non-Archived before ArchiveProductAsync's own check
+    /// runs (either it observes Active or, if the transition to Inactive
+    /// commits first, it observes Inactive — both are non-Archived). This is
+    /// not a genuine write-skew race like Scenario A because no interleaving
+    /// of these two operations can ever produce a state where the Sku looks
+    /// Archived to the Archive check.
     /// </summary>
     [Fact]
-    public async Task ArchiveProduct_Concurrent_With_Sku_Active_To_Inactive_Should_Never_Violate_Invariant()
+    public async Task ArchiveProduct_Concurrent_With_Sku_Active_To_Inactive_Should_Always_Be_Rejected()
     {
         var product = await SeedProductAsync(ProductStatus.Active);
         var sku = await SeedSkuAsync(product.Id, SkuStatus.Active);
@@ -194,17 +202,14 @@ public sealed class MongoProductSkuConcurrencyCoordinatorTests
                     sku.Id, SkuStatus.Active, SkuStatus.Inactive, CancellationToken.None);
             });
 
-        Assert.Contains(archiveResult, new[] { ArchiveProductCoordinationResult.Archived, ArchiveProductCoordinationResult.NonArchivedSkuExists, ArchiveProductCoordinationResult.ConcurrencyConflict });
-        Assert.Contains(transitionResult, new[] { SkuTransitionCoordinationResult.Transitioned, SkuTransitionCoordinationResult.ProductArchived });
+        Assert.Equal(ArchiveProductCoordinationResult.NonArchivedSkuExists, archiveResult);
+        Assert.Equal(SkuTransitionCoordinationResult.Transitioned, transitionResult);
 
         var state = await ReadPersistedStateAsync(product.Id, sku.Id);
         Assert.NotNull(state.Product);
         Assert.NotNull(state.Sku);
-
-        if (state.Product!.Status == ProductStatus.Archived)
-        {
-            Assert.Equal(SkuStatus.Archived, state.Sku!.Status);
-        }
+        Assert.Equal(ProductStatus.Active, state.Product!.Status);
+        Assert.Equal(SkuStatus.Inactive, state.Sku!.Status);
     }
 
     /// <summary>
@@ -267,33 +272,46 @@ public sealed class MongoProductSkuConcurrencyCoordinatorTests
     }
 
     /// <summary>
-    /// Scenario G — LifecycleRevision optimistic-concurrency conflict.
+    /// Scenario G — genuine <c>ProductDocument.LifecycleRevision</c>
+    /// optimistic-concurrency race.
     ///
-    /// Proves against real MongoDB that a stale Product lifecycle write
-    /// (one that read the Product before another writer already bumped
-    /// LifecycleRevision) cannot silently overwrite the newer state: the
-    /// stale attempt must observe ConcurrencyConflict, not a lost update.
+    /// Two concurrent <c>ArchiveProductAsync</c> attempts both read the same
+    /// Product document (same Status AND same LifecycleRevision) before
+    /// either commits, so neither can distinguish the other via `Status`
+    /// alone (both observe Active). It is specifically the conditional
+    /// update's <c>LifecycleRevision == &lt;value read&gt;</c> predicate
+    /// (`ArchiveProductAsync`'s final `UpdateOneAsync` filter) that lets
+    /// MongoDB serialize the two transactions: only the first to commit its
+    /// increment matches; the second's conditional write matches zero
+    /// documents and the coordinator reports `ConcurrencyConflict` instead of
+    /// a lost update. This proves the actual revision-based mechanism, not
+    /// merely `expectedStatus` string filtering (both attempts pass the
+    /// initial in-transaction Status check identically).
     /// </summary>
     [Fact]
-    public async Task ArchiveProduct_With_Stale_Expected_Status_Should_Not_Cause_Lost_Update()
+    public async Task Concurrent_ArchiveProduct_Attempts_Should_Serialize_Via_LifecycleRevision()
     {
         var product = await SeedProductAsync(ProductStatus.Active);
 
-        // First writer legitimately transitions Active -> Inactive, bumping
-        // LifecycleRevision via the same repository path used in production.
-        var firstWriterSucceeded = await _fixture.ProductRepository.UpdateStatusAsync(
-            product.Id, ProductStatus.Active, ProductStatus.Inactive, CancellationToken.None);
-        Assert.True(firstWriterSucceeded);
+        var (resultA, resultB) = await RunConcurrentlyAsync(
+            async barrier =>
+            {
+                barrier.SignalAndWait();
+                return await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
+            },
+            async barrier =>
+            {
+                barrier.SignalAndWait();
+                return await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
+            });
 
-        // A second, stale writer still believes the Product is Active (its
-        // in-memory read predates the first writer's commit) and attempts to
-        // archive it directly against that stale expectation.
-        var staleResult = await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
+        var results = new[] { resultA, resultB };
 
-        Assert.Equal(ArchiveProductCoordinationResult.ConcurrencyConflict, staleResult);
+        Assert.Single(results, r => r == ArchiveProductCoordinationResult.Archived);
+        Assert.Single(results, r => r == ArchiveProductCoordinationResult.ConcurrencyConflict);
 
         var persistedProduct = await _fixture.ProductRepository.GetByIdAsync(product.Id, CancellationToken.None);
         Assert.NotNull(persistedProduct);
-        Assert.Equal(ProductStatus.Inactive, persistedProduct!.Status);
+        Assert.Equal(ProductStatus.Archived, persistedProduct!.Status);
     }
 }
