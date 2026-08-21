@@ -156,4 +156,34 @@ public class UpdateCanonicalTaxonomyNodeHandlerTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.HandleAsync(command, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Update_stale_writer_throws_concurrency_conflict_instead_of_overwriting()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+        var productRepo = new FakeProductRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var handler = new UpdateCanonicalTaxonomyNodeHandler(repo, productRepo, new FakeCanonicalTaxonomyNodeUsageReader());
+
+        // Simulate another writer committing a change in the window between
+        // this command's read and its later conditional write.
+        repo.SimulateConcurrentWriteAfterNextRead = () => repo.BumpRevisionForTest(rootId);
+
+        var command = new UpdateCanonicalTaxonomyNodeCommand
+        {
+            CanonicalTaxonomyNodeId = rootId.Value,
+            Name = "Nome concorrente"
+        };
+
+        await Assert.ThrowsAsync<CanonicalTaxonomyNodeConcurrencyConflictException>(
+            () => handler.HandleAsync(command, CancellationToken.None));
+
+        var reloaded = await repo.GetByIdAsync(rootId, CancellationToken.None);
+        Assert.Equal("Catálogo", reloaded!.Name);
+    }
 }

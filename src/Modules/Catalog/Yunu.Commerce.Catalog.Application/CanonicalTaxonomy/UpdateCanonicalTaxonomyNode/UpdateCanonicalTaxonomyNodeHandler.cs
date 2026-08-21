@@ -31,6 +31,16 @@ namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.UpdateCanonicalTax
 /// "unavailable for new classification, existing references remain valid";
 /// see CreateProductHandler, which already requires Active), so a node with
 /// existing Products can still transition Active -&gt; Inactive.
+///
+/// Concurrency (docs task: "Yunu.Commerce - Canonical Taxonomy Concurrency
+/// Guard"): the node is loaded together with its persisted Revision, which
+/// is echoed back to <see cref="ICanonicalTaxonomyRepository.UpdateAsync"/>
+/// as an optimistic-concurrency guard. When another writer already changed
+/// the persisted Revision (rename, lifecycle transition, or a child
+/// created under this node), the conditional write matches zero rows and
+/// this handler throws <see cref="CanonicalTaxonomyNodeConcurrencyConflictException"/>
+/// instead of reloading and reinterpreting the original command
+/// (first-writer-wins); no automatic retry is performed.
 /// </summary>
 public sealed class UpdateCanonicalTaxonomyNodeHandler
 {
@@ -51,12 +61,14 @@ public sealed class UpdateCanonicalTaxonomyNodeHandler
     public async Task HandleAsync(UpdateCanonicalTaxonomyNodeCommand command, CancellationToken cancellationToken)
     {
         var id = new CanonicalTaxonomyNodeId(command.CanonicalTaxonomyNodeId);
-        var node = await _canonicalTaxonomyRepository.GetByIdAsync(id, cancellationToken);
+        var loaded = await _canonicalTaxonomyRepository.GetWithRevisionAsync(id, cancellationToken);
 
-        if (node is null)
+        if (loaded is not { } loadedNode)
         {
             throw new ArgumentException($"Canonical Taxonomy node '{command.CanonicalTaxonomyNodeId}' does not exist.", nameof(command));
         }
+
+        var (node, expectedRevision) = loadedNode;
 
         var isRename = !string.Equals(node.Name, command.Name.Trim(), StringComparison.Ordinal)
             || !string.Equals(node.Description, command.Description, StringComparison.Ordinal);
@@ -93,7 +105,13 @@ public sealed class UpdateCanonicalTaxonomyNodeHandler
             node.TransitionTo(status);
         }
 
-        await _canonicalTaxonomyRepository.UpdateAsync(node, cancellationToken);
+        var updated = await _canonicalTaxonomyRepository.UpdateAsync(node, expectedRevision, cancellationToken);
+
+        if (!updated)
+        {
+            throw new CanonicalTaxonomyNodeConcurrencyConflictException(
+                $"Canonical Taxonomy node '{command.CanonicalTaxonomyNodeId}' was concurrently modified by another writer. Reload the current state and retry explicitly.");
+        }
     }
 
     private async Task EnsureNotInUseForArchiveAsync(CanonicalTaxonomyNodeId id, CancellationToken cancellationToken)

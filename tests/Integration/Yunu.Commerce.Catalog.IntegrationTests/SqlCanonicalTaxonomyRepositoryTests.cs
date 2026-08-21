@@ -15,8 +15,9 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// deploy/databases/sqlserver/001-google-taxonomy-tables.sql,
 /// deploy/databases/sqlserver/006-create-canonical-taxonomy-segmentation.sql,
 /// deploy/databases/sqlserver/007-drop-legacy-catalog-hierarchy.sql,
-/// deploy/databases/sqlserver/008-add-segment-assignment-scope.sql and
-/// deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql
+/// deploy/databases/sqlserver/008-add-segment-assignment-scope.sql,
+/// deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql and
+/// deploy/databases/sqlserver/012-add-canonical-taxonomy-concurrency-guard.sql
 /// directly against the container. Migration 009 requires Google categories
 /// 166 ("Vestuário e acessórios") and 187 ("Sapatos") to already exist in
 /// Catalog.GoogleTaxonomyCategories with the expected pt-BR names/paths, so
@@ -39,6 +40,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         await RunScriptAsync(connectionString, "008-add-segment-assignment-scope.sql");
         await SeedGoogleTaxonomyCategoriesAsync(connectionString);
         await RunScriptAsync(connectionString, "009-reset-canonical-taxonomy-starter.sql");
+        await RunScriptAsync(connectionString, "012-add-canonical-taxonomy-concurrency-guard.sql");
 
         var options = Options.Create(new GoogleTaxonomySqlOptions
         {
@@ -192,10 +194,12 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var node = CreateRootNode("update-target");
         var id = await _repository.AddAsync(node, CancellationToken.None);
 
-        var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
-        persisted!.Update("Updated Name", "updated name", "Updated description", "Updated Name");
+        var loaded = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (persisted, revision) = loaded!.Value;
+        persisted.Update("Updated Name", "updated name", "Updated description", "Updated Name");
 
-        await _repository.UpdateAsync(persisted, CancellationToken.None);
+        var updated = await _repository.UpdateAsync(persisted, revision, CancellationToken.None);
+        Assert.True(updated);
 
         var reloaded = await _repository.GetByIdAsync(id, CancellationToken.None);
 
@@ -211,14 +215,146 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var node = CreateRootNode("archive-target");
         var id = await _repository.AddAsync(node, CancellationToken.None);
 
-        var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
-        persisted!.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
+        var loaded = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (persisted, revision) = loaded!.Value;
+        persisted.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
 
-        await _repository.UpdateAsync(persisted, CancellationToken.None);
+        var updated = await _repository.UpdateAsync(persisted, revision, CancellationToken.None);
+        Assert.True(updated);
 
         var reloaded = await _repository.GetByIdAsync(id, CancellationToken.None);
 
         Assert.Equal(CanonicalTaxonomyNodeStatus.Archived, reloaded!.Status);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_Advance_Persisted_Revision_On_Success()
+    {
+        var node = CreateRootNode("revision-advance-target");
+        var id = await _repository.AddAsync(node, CancellationToken.None);
+
+        var loaded = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (persisted, revision) = loaded!.Value;
+        Assert.Equal(1, revision);
+
+        persisted.Update("Revision Advance Renamed", "revision advance renamed", null, "Revision Advance Renamed");
+        var updated = await _repository.UpdateAsync(persisted, revision, CancellationToken.None);
+        Assert.True(updated);
+
+        var reloaded = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        Assert.Equal(revision + 1, reloaded!.Value.Revision);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Stale_Writer_Should_Fail_And_Not_Overwrite_Winner()
+    {
+        var node = CreateRootNode("stale-writer-target");
+        var id = await _repository.AddAsync(node, CancellationToken.None);
+
+        // Writer A and Writer B both load the same persisted Revision.
+        var loadedA = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (nodeA, revisionA) = loadedA!.Value;
+
+        var loadedB = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (nodeB, revisionB) = loadedB!.Value;
+
+        // Writer A updates successfully first.
+        nodeA.Update("Winner Name", "winner name", "Winner description", "Winner Name");
+        var updatedA = await _repository.UpdateAsync(nodeA, revisionA, CancellationToken.None);
+        Assert.True(updatedA);
+
+        // Writer B attempts to update using its now-stale Revision.
+        nodeB.Update("Stale Name", "stale name", "Stale description", "Stale Name");
+        var updatedB = await _repository.UpdateAsync(nodeB, revisionB, CancellationToken.None);
+        Assert.False(updatedB);
+
+        // Writer A's persisted state remains intact.
+        var reloaded = await _repository.GetByIdAsync(id, CancellationToken.None);
+        Assert.Equal("Winner Name", reloaded!.Name);
+        Assert.Equal("Winner description", reloaded.Description);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Lifecycle_Stale_Writer_Should_Not_Overwrite_Winner()
+    {
+        var node = CreateRootNode("lifecycle-stale-writer-target");
+        node.TransitionTo(CanonicalTaxonomyNodeStatus.Active);
+        var id = await _repository.AddAsync(node, CancellationToken.None);
+
+        var loadedA = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (nodeA, revisionA) = loadedA!.Value;
+
+        var loadedB = await _repository.GetWithRevisionAsync(id, CancellationToken.None);
+        var (nodeB, revisionB) = loadedB!.Value;
+
+        // Writer A transitions to Inactive and commits first.
+        nodeA.TransitionTo(CanonicalTaxonomyNodeStatus.Inactive);
+        var updatedA = await _repository.UpdateAsync(nodeA, revisionA, CancellationToken.None);
+        Assert.True(updatedA);
+
+        // Writer B attempts to transition to Archived using the stale Revision.
+        nodeB.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
+        var updatedB = await _repository.UpdateAsync(nodeB, revisionB, CancellationToken.None);
+        Assert.False(updatedB);
+
+        var reloaded = await _repository.GetByIdAsync(id, CancellationToken.None);
+        Assert.Equal(CanonicalTaxonomyNodeStatus.Inactive, reloaded!.Status);
+    }
+
+    [Fact]
+    public async Task AddChildAsync_Should_Fail_When_Parent_Was_Concurrently_Archived()
+    {
+        var parent = CreateRootNode("archive-vs-createchild-parent");
+        parent.TransitionTo(CanonicalTaxonomyNodeStatus.Active);
+        var parentId = await _repository.AddAsync(parent, CancellationToken.None);
+
+        var loadedForArchive = await _repository.GetWithRevisionAsync(parentId, CancellationToken.None);
+        var (parentForArchive, parentRevisionForArchive) = loadedForArchive!.Value;
+
+        var loadedForCreateChild = await _repository.GetWithRevisionAsync(parentId, CancellationToken.None);
+        var (_, parentRevisionForCreateChild) = loadedForCreateChild!.Value;
+
+        // Archive wins the race first, incrementing the parent's Revision.
+        parentForArchive.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
+        var archived = await _repository.UpdateAsync(parentForArchive, parentRevisionForArchive, CancellationToken.None);
+        Assert.True(archived);
+
+        // CreateChild now races against a stale parent Revision and must fail,
+        // proving an Archived parent + newly-created child can never commit.
+        var child = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "archive-vs-createchild-child", "Child", "child",
+            null, 1, "Name archive-vs-createchild-parent > Child", status: CanonicalTaxonomyNodeStatus.Active);
+
+        var result = await _repository.AddChildAsync(child, parentRevisionForCreateChild, CancellationToken.None);
+
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.ParentConcurrencyConflict, result.Outcome);
+
+        var hasChildren = await _repository.HasChildrenAsync(parentId, CancellationToken.None);
+        Assert.False(hasChildren);
+    }
+
+    [Fact]
+    public async Task AddChildAsync_Should_Succeed_And_Advance_Parent_Revision_When_Parent_Not_Archived()
+    {
+        var parent = CreateRootNode("createchild-advances-parent-revision");
+        parent.TransitionTo(CanonicalTaxonomyNodeStatus.Active);
+        var parentId = await _repository.AddAsync(parent, CancellationToken.None);
+
+        var loaded = await _repository.GetWithRevisionAsync(parentId, CancellationToken.None);
+        var (_, parentRevision) = loaded!.Value;
+
+        var child = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "createchild-advances-parent-revision-child", "Child", "child",
+            null, 1, "Name createchild-advances-parent-revision > Child", status: CanonicalTaxonomyNodeStatus.Active);
+
+        var result = await _repository.AddChildAsync(child, parentRevision, CancellationToken.None);
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.Created, result.Outcome);
+
+        var reloadedParent = await _repository.GetWithRevisionAsync(parentId, CancellationToken.None);
+        Assert.Equal(parentRevision + 1, reloadedParent!.Value.Revision);
+
+        var hasChildren = await _repository.HasChildrenAsync(parentId, CancellationToken.None);
+        Assert.True(hasChildren);
     }
 
     [Fact]

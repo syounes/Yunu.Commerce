@@ -22,6 +22,15 @@ namespace Yunu.Commerce.Catalog.Application.CanonicalTaxonomy.CreateCanonicalTax
 /// Inactive, and blocking only Archived is the smallest rule that prevents
 /// an evident inconsistency (mirrors
 /// Yunu.Commerce.Catalog.Application.SegmentOptions.CreateSegmentOption.CreateSegmentOptionHandler).
+///
+/// Concurrency (docs task: "Yunu.Commerce - Canonical Taxonomy Concurrency
+/// Guard" §7): child creation participates in the parent's own Revision.
+/// The parent's Status/Revision is re-checked and its Revision incremented
+/// atomically together with the child insert (see
+/// <see cref="ICanonicalTaxonomyRepository.AddChildAsync"/>), so a
+/// concurrent Archive of the parent and this call cannot both commit: the
+/// loser fails explicitly instead of silently producing an Archived parent
+/// with a newly-created child. This handler does not retry automatically.
 /// </summary>
 public sealed class CreateCanonicalTaxonomyNodeHandler
 {
@@ -50,17 +59,17 @@ public sealed class CreateCanonicalTaxonomyNodeHandler
 
         var pendingId = new CanonicalTaxonomyNodeId(0);
 
-        Domain.CanonicalTaxonomy.CanonicalTaxonomyNode node;
-
         if (command.ParentId is { } parentIdValue)
         {
             var parentId = new CanonicalTaxonomyNodeId(parentIdValue);
-            var parent = await _canonicalTaxonomyRepository.GetByIdAsync(parentId, cancellationToken);
+            var loaded = await _canonicalTaxonomyRepository.GetWithRevisionAsync(parentId, cancellationToken);
 
-            if (parent is null)
+            if (loaded is not { } loadedParent)
             {
                 throw new ArgumentException($"Parent node '{parentIdValue}' does not exist.", nameof(command));
             }
+
+            var (parent, parentRevision) = loadedParent;
 
             if (parent.Status == Domain.CanonicalTaxonomy.CanonicalTaxonomyNodeStatus.Archived)
             {
@@ -71,24 +80,45 @@ public sealed class CreateCanonicalTaxonomyNodeHandler
             var depth = parent.Depth + 1;
             var path = $"{parent.Path.Trim()} > {command.Name.Trim()}";
 
-            node = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateChild(
+            var childNode = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateChild(
                 pendingId, parentId, command.Code, command.Name, normalizedName, command.Description,
                 depth, path);
+
+            var result = await _canonicalTaxonomyRepository.AddChildAsync(childNode, parentRevision, cancellationToken);
+
+            switch (result.Outcome)
+            {
+                case AddCanonicalTaxonomyChildOutcome.Created:
+                    return new CreateCanonicalTaxonomyNodeResult
+                    {
+                        CanonicalTaxonomyNodeId = result.AssignedId!.Value.Value
+                    };
+                case AddCanonicalTaxonomyChildOutcome.ParentNotFound:
+                    throw new ArgumentException($"Parent node '{parentIdValue}' does not exist.", nameof(command));
+                case AddCanonicalTaxonomyChildOutcome.ParentArchived:
+                    throw new CanonicalTaxonomyNodeParentArchivedException(
+                        $"Parent Canonical Taxonomy node '{parentIdValue}' is Archived and cannot receive new children.");
+                case AddCanonicalTaxonomyChildOutcome.ParentConcurrencyConflict:
+                    throw new CanonicalTaxonomyNodeConcurrencyConflictException(
+                        $"Parent Canonical Taxonomy node '{parentIdValue}' was concurrently modified by another writer. Reload the current state and retry explicitly.");
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(result), result.Outcome, "Unsupported AddChild outcome.");
+            }
         }
         else
         {
             var path = command.Name.Trim();
 
-            node = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateRoot(
+            var rootNode = Domain.CanonicalTaxonomy.CanonicalTaxonomyNode.CreateRoot(
                 pendingId, command.Code, command.Name, normalizedName, command.Description,
                 path);
+
+            var assignedId = await _canonicalTaxonomyRepository.AddAsync(rootNode, cancellationToken);
+
+            return new CreateCanonicalTaxonomyNodeResult
+            {
+                CanonicalTaxonomyNodeId = assignedId.Value
+            };
         }
-
-        var assignedId = await _canonicalTaxonomyRepository.AddAsync(node, cancellationToken);
-
-        return new CreateCanonicalTaxonomyNodeResult
-        {
-            CanonicalTaxonomyNodeId = assignedId.Value
-        };
     }
 }
