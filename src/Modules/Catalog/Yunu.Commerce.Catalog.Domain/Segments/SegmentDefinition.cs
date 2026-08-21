@@ -15,8 +15,11 @@ public sealed class InvalidSegmentDefinitionStatusTransitionException : Exceptio
 /// <summary>
 /// Thrown when a structural field (SelectionMode, AssignmentScope) is
 /// changed while the Segment Definition is not in
-/// <see cref="SegmentDefinitionStatus.Draft"/>. This is a temporary
-/// protection until Product/Sku/canonical association usage checks exist.
+/// <see cref="SegmentDefinitionStatus.Draft"/>. Structural fields remain
+/// Draft-only according to this Domain rule; this is a separate concern from
+/// the lifecycle/usage guards involving external references (Approved
+/// Canonical Taxonomy associations, Product/Sku Segment assignments), which
+/// are enforced by Catalog.Application, not by this Aggregate.
 /// </summary>
 public sealed class SegmentDefinitionStructuralChangeNotAllowedException : Exception
 {

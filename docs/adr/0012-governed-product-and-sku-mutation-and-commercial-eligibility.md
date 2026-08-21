@@ -63,19 +63,37 @@ lifecycle remains fully independent, preserving docs/adr/0010 unchanged.
 
 Because Product and Sku are independent Aggregates, cross-aggregate rules
 cannot live inside either Aggregate. They are enforced by
-`Catalog.Application`:
+`Catalog.Application` through the atomic coordination boundary described in
+section 2.5, `IProductSkuConcurrencyCoordinator`
+(`MongoProductSkuConcurrencyCoordinator` for MongoDB):
 
-- **Archiving a Product** (`TransitionProductStatusHandler`) is blocked while
-  at least one of its Skus is not `Archived`
-  (`ISkuRepository.ExistsNonArchivedByProductIdAsync`), raising
-  `ProductHasNonArchivedSkusException`.
-- **A Sku transitioning to a non-Archived status** is blocked while its
-  owning Product is `Archived` (`TransitionSkuStatusHandler` checks
-  `IProductRepository.GetByIdAsync`), raising `ProductArchivedException`. A
-  Sku may still transition *to* `Archived` regardless of its Product's
-  status.
-- **Creating a Sku** under an `Archived` Product is blocked by
-  `CreateSkuHandler`.
+- **Archiving a Product** (`TransitionProductStatusHandler`) delegates to
+  `IProductSkuConcurrencyCoordinator.ArchiveProductAsync(...)`. The
+  coordinator performs the required Product/Sku checks atomically within the
+  MongoDB transactional coordination boundary; the handler translates the
+  returned coordination result into the appropriate Application exception
+  (e.g. `ProductHasNonArchivedSkusException`). `ISkuRepository.ExistsNonArchivedByProductIdAsync`
+  is not the handler's final concurrency mechanism.
+- **A Sku transitioning to a non-Archived status while its owning Product
+  may be `Archived`** (`TransitionSkuStatusHandler`) delegates to
+  `IProductSkuConcurrencyCoordinator.TransitionSkuIfProductNotArchivedAsync(...)`.
+  The Product status check occurs as part of the coordinator's transactional
+  operation; the handler translates the coordination result into the
+  appropriate Application exception (e.g. `ProductArchivedException`). A
+  direct `IProductRepository.GetByIdAsync` read is not the final race-safe
+  mechanism. A Sku may still transition *to* `Archived` regardless of its
+  Product's status.
+- **Creating a Sku** (`CreateSkuHandler`) delegates to
+  `IProductSkuConcurrencyCoordinator.CreateSkuIfProductNotArchivedAsync(...)`,
+  preventing a non-Archived Sku from being created concurrently with Product
+  archive.
+
+These facts remain unchanged: `Product.Status == Archived` implies no Sku
+belonging to that Product may be non-Archived; Product and Sku remain
+independent Aggregate Roots; cross-aggregate guards live outside the
+Aggregates; a Sku may transition to `Archived` even when its Product is
+`Archived`; Product status is never propagated into Sku and Sku status is
+never propagated into Product; docs/adr/0010 remains unchanged.
 
 ### 2.3 Commercial Eligibility
 

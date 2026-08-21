@@ -43,13 +43,15 @@ public sealed class InvalidProductStatusTransitionException : Exception
 ///
 /// Lifecycle (docs/adr/0012-governed-product-and-sku-mutation-and-commercial-eligibility.md):
 /// Draft -&gt; Active/Archived; Active -&gt; Inactive/Archived;
-/// Inactive -&gt; Active/Archived; Archived is terminal. This Aggregate only
-/// enforces the state machine itself; it has no visibility into Sku usage,
-/// so the Archive usage guard (no non-Archived Sku may exist) is enforced by
-/// Catalog.Application before <see cref="TransitionTo"/> is called for an
-/// Archive transition. Product status is never propagated to/from Sku: each
-/// Aggregate's lifecycle is fully independent (docs/adr/0010 preserved
-/// unchanged).
+/// Inactive -&gt; Active/Archived; Archived is terminal. This Aggregate owns
+/// only its lifecycle state-machine invariants; it has no visibility into
+/// Sku state. Cross-aggregate invariants involving Sku state (e.g. no
+/// non-Archived Sku may exist for an Archived Product) are enforced outside
+/// this Aggregate by Catalog.Application through the Product/Sku
+/// concurrency coordination mechanism (<see cref="Yunu.Commerce.Catalog.Domain.Concurrency.IProductSkuConcurrencyCoordinator"/>).
+/// Product never reads or mutates Sku state, and Sku status is never
+/// propagated to/from Product: each Aggregate's lifecycle is fully
+/// independent (docs/adr/0010 preserved unchanged).
 /// </summary>
 public sealed class Product
 {
@@ -245,10 +247,11 @@ public sealed class Product
     /// Transitions this Product's lifecycle Status (docs/adr/0012). Only the
     /// state machine itself is enforced here: Draft -&gt; Active/Archived,
     /// Active -&gt; Inactive/Archived, Inactive -&gt; Active/Archived, Archived is
-    /// terminal. Cross-aggregate usage guards (e.g. no non-Archived Sku may
-    /// exist before archiving this Product) are the Application layer's
-    /// responsibility and must be checked before calling this method for an
-    /// Archive transition. This method never inspects or mutates Sku state.
+    /// terminal. Cross-aggregate invariants involving Sku state (e.g. no
+    /// non-Archived Sku may exist for an Archived Product) are the
+    /// Application layer's responsibility, enforced race-safely through the
+    /// Product/Sku concurrency coordination mechanism. This method never
+    /// inspects or mutates Sku state.
     /// </summary>
     public void TransitionTo(ProductStatus newStatus)
     {

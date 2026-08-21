@@ -1,9 +1,11 @@
 ﻿using Xunit;
+using MongoDB.Driver;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Concurrency;
 using Yunu.Commerce.Catalog.Domain.Products;
 using Yunu.Commerce.Catalog.Domain.Skus;
+using Yunu.Commerce.Catalog.Infrastructure.Persistence.Mongo;
 
 namespace Yunu.Commerce.Catalog.IntegrationTests;
 
@@ -25,14 +27,19 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// Test classification:
 /// - Genuine concurrency races (both operations can independently observe a
 ///   valid precondition and race toward the forbidden final state):
-///   Scenario A (Archive vs CreateSku) and Scenario G (two concurrent
-///   Archive attempts racing on LifecycleRevision).
+///   Scenario A (Archive vs CreateSku, the primary write-skew proof) and
+///   Scenario G (two concurrent Archive attempts, proving first-writer-wins;
+///   it does not claim both transactions read the same LifecycleRevision
+///   before either committed).
 /// - Deterministic guards (the outcome cannot depend on timing because one
 ///   side's precondition check already fails regardless of interleaving):
 ///   Scenarios B/C/D/E/F. A Sku that already exists and is non-Archived
 ///   before ArchiveProductAsync's own check runs guarantees
 ///   NonArchivedSkuExists; these are kept as integration coverage of the
 ///   guards themselves, not as concurrency proofs.
+/// - A dedicated deterministic test proves that CreateSku and ArchiveProduct
+///   (opposite sides of the invariant) both increment the same persisted
+///   `ProductDocument.LifecycleRevision` coordination token.
 ///
 /// Concurrency is driven with real overlapping `Task`s racing against the
 /// same underlying documents; a <see cref="Barrier"/> is used to align both
@@ -272,24 +279,26 @@ public sealed class MongoProductSkuConcurrencyCoordinatorTests
     }
 
     /// <summary>
-    /// Scenario G — genuine <c>ProductDocument.LifecycleRevision</c>
-    /// optimistic-concurrency race.
+    /// Scenario G — concurrent Product Archive attempts, first-writer-wins.
     ///
-    /// Two concurrent <c>ArchiveProductAsync</c> attempts both read the same
-    /// Product document (same Status AND same LifecycleRevision) before
-    /// either commits, so neither can distinguish the other via `Status`
-    /// alone (both observe Active). It is specifically the conditional
-    /// update's <c>LifecycleRevision == &lt;value read&gt;</c> predicate
-    /// (`ArchiveProductAsync`'s final `UpdateOneAsync` filter) that lets
-    /// MongoDB serialize the two transactions: only the first to commit its
-    /// increment matches; the second's conditional write matches zero
-    /// documents and the coordinator reports `ConcurrencyConflict` instead of
-    /// a lost update. This proves the actual revision-based mechanism, not
-    /// merely `expectedStatus` string filtering (both attempts pass the
-    /// initial in-transaction Status check identically).
+    /// Two <c>ArchiveProductAsync</c> operations are launched concurrently
+    /// against the same Product, synchronized via a <see cref="Barrier"/>
+    /// immediately before each calls <c>ArchiveProductAsync</c>. This proves
+    /// the observable outcome: only one of the two operations successfully
+    /// archives the Product; the competing operation returns
+    /// `ConcurrencyConflict`; the final persisted Product state is
+    /// `Archived`. It does NOT prove — and does not claim — that both
+    /// transactions were guaranteed to read the same
+    /// <c>ProductDocument.LifecycleRevision</c> before either committed: the
+    /// Barrier only aligns the two calls' starting instant, not their
+    /// in-transaction reads, so one transaction may already have committed
+    /// before the other performs its first transactional read. The
+    /// deterministic proof that both sides of the cross-aggregate invariant
+    /// touch the same persisted `LifecycleRevision` token is provided
+    /// separately (see the dedicated LifecycleRevision participation test).
     /// </summary>
     [Fact]
-    public async Task Concurrent_ArchiveProduct_Attempts_Should_Serialize_Via_LifecycleRevision()
+    public async Task Concurrent_ArchiveProduct_Attempts_Should_Be_FirstWriterWins()
     {
         var product = await SeedProductAsync(ProductStatus.Active);
 
@@ -313,5 +322,50 @@ public sealed class MongoProductSkuConcurrencyCoordinatorTests
         var persistedProduct = await _fixture.ProductRepository.GetByIdAsync(product.Id, CancellationToken.None);
         Assert.NotNull(persistedProduct);
         Assert.Equal(ProductStatus.Archived, persistedProduct!.Status);
+    }
+
+    /// <summary>
+    /// Deterministic proof that protected cross-aggregate operations on
+    /// opposite sides of the Product/Sku invariant (CreateSku and
+    /// ArchiveProduct) actually increment the same persisted
+    /// <c>ProductDocument.LifecycleRevision</c> coordination token, by
+    /// inspecting the raw Mongo document directly through the test's own
+    /// Mongo client/collection (infrastructure-only; never exposed through
+    /// the Domain <c>Product</c> Aggregate or any DTO). This is not a test of
+    /// MongoDB itself: it proves that CreateSku and ArchiveProduct share a
+    /// genuine common write point instead of relying on independent,
+    /// uncoordinated document writes.
+    /// </summary>
+    [Fact]
+    public async Task LifecycleRevision_Should_Increase_Across_CreateSku_And_ArchiveProduct()
+    {
+        var product = await SeedProductAsync(ProductStatus.Active);
+
+        var products = _fixture.MongoClient
+            .GetDatabase("yunu_catalog_concurrency_tests")
+            .GetCollection<ProductDocument>("products");
+
+        var initialRevision = (await products.Find(p => p.Id == product.Id.Value).FirstAsync()).LifecycleRevision;
+
+        var sku = Sku.Create(SkuId.New(), product.Id, new SkuCode($"SKU-{Guid.NewGuid():N}"), status: SkuStatus.Draft);
+        var createResult = await _fixture.Coordinator.CreateSkuIfProductNotArchivedAsync(sku, CancellationToken.None);
+        Assert.Equal(CreateSkuCoordinationResult.Created, createResult);
+
+        var revisionAfterCreateSku = (await products.Find(p => p.Id == product.Id.Value).FirstAsync()).LifecycleRevision;
+        Assert.True(
+            revisionAfterCreateSku > initialRevision,
+            $"Expected LifecycleRevision to increase after CreateSku (was {initialRevision}, now {revisionAfterCreateSku}).");
+
+        var archiveSkuResult = await _fixture.Coordinator.TransitionSkuIfProductNotArchivedAsync(
+            sku.Id, SkuStatus.Draft, SkuStatus.Archived, CancellationToken.None);
+        Assert.Equal(SkuTransitionCoordinationResult.Transitioned, archiveSkuResult);
+
+        var archiveResult = await _fixture.Coordinator.ArchiveProductAsync(product.Id, ProductStatus.Active, CancellationToken.None);
+        Assert.Equal(ArchiveProductCoordinationResult.Archived, archiveResult);
+
+        var revisionAfterArchiveProduct = (await products.Find(p => p.Id == product.Id.Value).FirstAsync()).LifecycleRevision;
+        Assert.True(
+            revisionAfterArchiveProduct > revisionAfterCreateSku,
+            $"Expected LifecycleRevision to increase again after ArchiveProduct (was {revisionAfterCreateSku}, now {revisionAfterArchiveProduct}).");
     }
 }
