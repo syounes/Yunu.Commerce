@@ -161,4 +161,86 @@ public class CreateCanonicalTaxonomyNodeHandlerTests
         var hasChildren = await repo.HasChildrenAsync(rootId, CancellationToken.None);
         Assert.False(hasChildren);
     }
+
+    [Fact]
+    public async Task AddAsync_Continues_To_Allow_Multiple_Independent_Root_Nodes()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+
+        var eletronicos = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "eletronicos", "Eletrônicos", "eletronicos", null, "Eletrônicos",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var moda = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "moda", "Moda", "moda", null, "Moda",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var casa = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "casa", "Casa", "casa", null, "Casa",
+            status: CanonicalTaxonomyNodeStatus.Active);
+
+        var eletronicosId = await repo.AddAsync(eletronicos, CancellationToken.None);
+        var modaId = await repo.AddAsync(moda, CancellationToken.None);
+        var casaId = await repo.AddAsync(casa, CancellationToken.None);
+
+        var roots = await repo.GetRootsAsync(CancellationToken.None);
+
+        Assert.Contains(roots, r => r.Id == eletronicosId);
+        Assert.Contains(roots, r => r.Id == modaId);
+        Assert.Contains(roots, r => r.Id == casaId);
+        Assert.All(roots, r => Assert.Null(r.ParentId));
+    }
+
+    [Fact]
+    public async Task Multiple_Children_Under_Same_Parent_Succeed_When_Each_Uses_Latest_Parent_Revision()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var handler = new CreateCanonicalTaxonomyNodeHandler(repo);
+
+        await handler.HandleAsync(
+            new CreateCanonicalTaxonomyNodeCommand { ParentId = rootId.Value, Code = "child-1", Name = "Filho 1" },
+            CancellationToken.None);
+
+        // Reloading the parent's Revision before the next child creation
+        // (rather than reusing the stale one captured before) is required:
+        // the first successful AddChildAsync already advanced it.
+        await handler.HandleAsync(
+            new CreateCanonicalTaxonomyNodeCommand { ParentId = rootId.Value, Code = "child-2", Name = "Filho 2" },
+            CancellationToken.None);
+
+        var children = await repo.GetChildrenAsync(rootId, CancellationToken.None);
+        Assert.Equal(2, children.Count);
+    }
+
+    [Fact]
+    public async Task AddChildAsync_With_Stale_Parent_Revision_Fails_With_Concurrency_Conflict()
+    {
+        var repo = new FakeCanonicalTaxonomyRepository();
+
+        var root = CanonicalTaxonomyNode.CreateRoot(
+            new CanonicalTaxonomyNodeId(0), "cat", "Catálogo", "catalogo", null, "Catálogo",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        var rootId = await repo.AddAsync(root, CancellationToken.None);
+
+        var staleRevision = repo.GetRevisionForTest(rootId);
+
+        // Advance the parent's Revision via a first, legitimate child creation.
+        var firstChild = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), rootId, "first-child", "Primeiro Filho", "primeiro filho",
+            null, 1, "Catálogo > Primeiro Filho", status: CanonicalTaxonomyNodeStatus.Active);
+        var firstResult = await repo.AddChildAsync(firstChild, staleRevision, CancellationToken.None);
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.Created, firstResult.Outcome);
+
+        // A second caller still holding the now-stale Revision must fail.
+        var secondChild = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), rootId, "second-child", "Segundo Filho", "segundo filho",
+            null, 1, "Catálogo > Segundo Filho", status: CanonicalTaxonomyNodeStatus.Active);
+        var secondResult = await repo.AddChildAsync(secondChild, staleRevision, CancellationToken.None);
+
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.ParentConcurrencyConflict, secondResult.Outcome);
+    }
 }

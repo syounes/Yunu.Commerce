@@ -547,4 +547,61 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         var hasChildren = await _repository.HasChildrenAsync(parentId, CancellationToken.None);
         Assert.False(hasChildren);
     }
+
+    [Fact]
+    public async Task AddAsync_Continues_To_Allow_Multiple_Independent_Root_Nodes()
+    {
+        var root1 = await _repository.AddAsync(CreateRootNode("multi-root-1"), CancellationToken.None);
+        var root2 = await _repository.AddAsync(CreateRootNode("multi-root-2"), CancellationToken.None);
+        var root3 = await _repository.AddAsync(CreateRootNode("multi-root-3"), CancellationToken.None);
+
+        var roots = await _repository.GetRootsAsync(CancellationToken.None);
+
+        Assert.Contains(roots, r => r.Id == root1);
+        Assert.Contains(roots, r => r.Id == root2);
+        Assert.Contains(roots, r => r.Id == root3);
+    }
+
+    [Fact]
+    public async Task Multiple_Children_Under_Same_Parent_Succeed_When_Each_Uses_Latest_Parent_Revision()
+    {
+        var parentId = await _repository.AddAsync(CreateRootNode("multi-child-parent"), CancellationToken.None);
+
+        var child1 = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "multi-child-1", "Child 1", "child 1", null, 1, "Name multi-child-parent > Child 1",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        await AddChildForTestAsync(child1, parentId);
+
+        // Reload the parent's current Revision (already advanced by the
+        // first AddChildAsync) rather than reusing a stale value.
+        var child2 = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "multi-child-2", "Child 2", "child 2", null, 1, "Name multi-child-parent > Child 2",
+            status: CanonicalTaxonomyNodeStatus.Active);
+        await AddChildForTestAsync(child2, parentId);
+
+        var children = await _repository.GetChildrenAsync(parentId, CancellationToken.None);
+        Assert.Equal(2, children.Count);
+    }
+
+    [Fact]
+    public async Task AddChildAsync_With_Stale_Parent_Revision_Fails_With_Concurrency_Conflict()
+    {
+        var parentId = await _repository.AddAsync(CreateRootNode("stale-revision-parent"), CancellationToken.None);
+
+        var loaded = await _repository.GetWithRevisionAsync(parentId, CancellationToken.None);
+        var (_, staleRevision) = loaded!.Value;
+
+        var firstChild = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "stale-revision-first-child", "Child 1", "child 1",
+            null, 1, "Name stale-revision-parent > Child 1", status: CanonicalTaxonomyNodeStatus.Active);
+        var firstResult = await _repository.AddChildAsync(firstChild, staleRevision, CancellationToken.None);
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.Created, firstResult.Outcome);
+
+        var secondChild = CanonicalTaxonomyNode.CreateChild(
+            new CanonicalTaxonomyNodeId(0), parentId, "stale-revision-second-child", "Child 2", "child 2",
+            null, 1, "Name stale-revision-parent > Child 2", status: CanonicalTaxonomyNodeStatus.Active);
+        var secondResult = await _repository.AddChildAsync(secondChild, staleRevision, CancellationToken.None);
+
+        Assert.Equal(AddCanonicalTaxonomyChildOutcome.ParentConcurrencyConflict, secondResult.Outcome);
+    }
 }
