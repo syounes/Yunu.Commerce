@@ -317,6 +317,143 @@ public class SegmentDefinitionTests
                 definition.Status));
     }
 
+    [Fact]
+    public void Invalid_status_transition_leaves_all_mutable_state_unchanged()
+    {
+        var definition = CreateDraft();
+
+        Assert.Throws<InvalidSegmentDefinitionStatusTransitionException>(() =>
+            definition.Update(
+                new SegmentDefinitionName("Changed"),
+                "Changed description",
+                "Changed semantic text",
+                definition.SelectionMode,
+                definition.AssignmentScope,
+                SegmentDefinitionStatus.Inactive));
+
+        Assert.Equal("Gender", definition.Name.Value);
+        Assert.Equal("GENDER", definition.NormalizedName);
+        Assert.Null(definition.Description);
+        Assert.Null(definition.SemanticText);
+        Assert.Equal(SegmentSelectionMode.Single, definition.SelectionMode);
+        Assert.Equal(SegmentAssignmentScope.Product, definition.AssignmentScope);
+        Assert.Equal(SegmentDefinitionStatus.Draft, definition.Status);
+    }
+
+    [Fact]
+    public void Invalid_structural_change_leaves_all_mutable_state_unchanged()
+    {
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
+        MoveTo(definition, SegmentDefinitionStatus.Active);
+
+        Assert.Throws<SegmentDefinitionStructuralChangeNotAllowedException>(() =>
+            definition.Update(
+                new SegmentDefinitionName("Changed"),
+                "Changed description",
+                "Changed semantic text",
+                SegmentSelectionMode.Multiple,
+                definition.AssignmentScope,
+                definition.Status));
+
+        Assert.Equal("Gender", definition.Name.Value);
+        Assert.Equal("GENDER", definition.NormalizedName);
+        Assert.Null(definition.Description);
+        Assert.Null(definition.SemanticText);
+        Assert.Equal(SegmentSelectionMode.Single, definition.SelectionMode);
+        Assert.Equal(SegmentAssignmentScope.Product, definition.AssignmentScope);
+        Assert.Equal(SegmentDefinitionStatus.Active, definition.Status);
+    }
+
+    [Fact]
+    public void Invalid_description_leaves_all_mutable_state_unchanged()
+    {
+        var definition = CreateDraft();
+        var tooLong = new string('a', 1001);
+
+        Assert.Throws<ArgumentException>(() =>
+            definition.Update(
+                new SegmentDefinitionName("Changed"),
+                tooLong,
+                definition.SemanticText,
+                definition.SelectionMode,
+                definition.AssignmentScope,
+                SegmentDefinitionStatus.Active));
+
+        Assert.Equal("Gender", definition.Name.Value);
+        Assert.Equal("GENDER", definition.NormalizedName);
+        Assert.Null(definition.Description);
+        Assert.Null(definition.SemanticText);
+        Assert.Equal(SegmentSelectionMode.Single, definition.SelectionMode);
+        Assert.Equal(SegmentAssignmentScope.Product, definition.AssignmentScope);
+        Assert.Equal(SegmentDefinitionStatus.Draft, definition.Status);
+    }
+
+    [Fact]
+    public void Invalid_semantic_text_leaves_all_mutable_state_unchanged()
+    {
+        var definition = CreateDraft();
+        var tooLong = new string('a', 2001);
+
+        Assert.Throws<ArgumentException>(() =>
+            definition.Update(
+                new SegmentDefinitionName("Changed"),
+                definition.Description,
+                tooLong,
+                definition.SelectionMode,
+                definition.AssignmentScope,
+                SegmentDefinitionStatus.Active));
+
+        Assert.Equal("Gender", definition.Name.Value);
+        Assert.Equal("GENDER", definition.NormalizedName);
+        Assert.Null(definition.Description);
+        Assert.Null(definition.SemanticText);
+        Assert.Equal(SegmentSelectionMode.Single, definition.SelectionMode);
+        Assert.Equal(SegmentAssignmentScope.Product, definition.AssignmentScope);
+        Assert.Equal(SegmentDefinitionStatus.Draft, definition.Status);
+    }
+
+    [Fact]
+    public void Valid_update_applies_all_requested_changes()
+    {
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
+
+        definition.Update(
+            new SegmentDefinitionName("Renamed"),
+            "New description",
+            "New semantic text",
+            SegmentSelectionMode.Multiple,
+            SegmentAssignmentScope.Sku,
+            SegmentDefinitionStatus.Draft);
+
+        Assert.Equal("Renamed", definition.Name.Value);
+        Assert.Equal("RENAMED", definition.NormalizedName);
+        Assert.Equal("New description", definition.Description);
+        Assert.Equal("New semantic text", definition.SemanticText);
+        Assert.Equal(SegmentSelectionMode.Multiple, definition.SelectionMode);
+        Assert.Equal(SegmentAssignmentScope.Sku, definition.AssignmentScope);
+        Assert.Equal(SegmentDefinitionStatus.Draft, definition.Status);
+    }
+
+    [Fact]
+    public void Valid_update_with_valid_lifecycle_transition_applies_fields_and_status_together()
+    {
+        var definition = CreateDraft(selectionMode: SegmentSelectionMode.Single, assignmentScope: SegmentAssignmentScope.Product);
+
+        definition.Update(
+            new SegmentDefinitionName("Renamed"),
+            "New description",
+            "New semantic text",
+            definition.SelectionMode,
+            definition.AssignmentScope,
+            SegmentDefinitionStatus.Active);
+
+        Assert.Equal("Renamed", definition.Name.Value);
+        Assert.Equal("RENAMED", definition.NormalizedName);
+        Assert.Equal("New description", definition.Description);
+        Assert.Equal("New semantic text", definition.SemanticText);
+        Assert.Equal(SegmentDefinitionStatus.Active, definition.Status);
+    }
+
     private static void MoveTo(SegmentDefinition definition, SegmentDefinitionStatus target)
     {
         // Helper to walk allowed transitions to reach a target status from Draft.

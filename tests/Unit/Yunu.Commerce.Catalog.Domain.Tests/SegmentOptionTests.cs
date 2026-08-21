@@ -277,4 +277,130 @@ public class SegmentOptionTests
         Assert.Throws<InvalidSegmentOptionStatusTransitionException>(() =>
             option.Update(option.Name, option.Description, option.SemanticText, option.DisplayOrder, to));
     }
+
+    [Fact]
+    public void Invalid_status_transition_leaves_all_mutable_state_unchanged()
+    {
+        var option = CreateDraft(name: "Masculino");
+
+        Assert.Throws<InvalidSegmentOptionStatusTransitionException>(() =>
+            option.Update(
+                new SegmentOptionName("Changed"),
+                "Changed description",
+                "Changed semantic text",
+                50,
+                SegmentOptionStatus.Inactive));
+
+        Assert.Equal("Masculino", option.Name.Value);
+        Assert.Equal("MASCULINO", option.NormalizedName);
+        Assert.Null(option.Description);
+        Assert.Null(option.SemanticText);
+        Assert.Equal(0, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Draft, option.Status);
+    }
+
+    [Fact]
+    public void Negative_display_order_leaves_all_mutable_state_unchanged()
+    {
+        var option = CreateDraft(name: "Masculino");
+
+        Assert.Throws<ArgumentException>(() =>
+            option.Update(
+                new SegmentOptionName("Changed"),
+                "Changed description",
+                "Changed semantic text",
+                -1,
+                SegmentOptionStatus.Active));
+
+        Assert.Equal("Masculino", option.Name.Value);
+        Assert.Equal("MASCULINO", option.NormalizedName);
+        Assert.Null(option.Description);
+        Assert.Null(option.SemanticText);
+        Assert.Equal(0, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Draft, option.Status);
+    }
+
+    [Fact]
+    public void Invalid_description_leaves_all_mutable_state_unchanged()
+    {
+        var option = CreateDraft(name: "Masculino");
+        var tooLong = new string('a', 1001);
+
+        Assert.Throws<ArgumentException>(() =>
+            option.Update(
+                new SegmentOptionName("Changed"),
+                tooLong,
+                option.SemanticText,
+                50,
+                SegmentOptionStatus.Active));
+
+        Assert.Equal("Masculino", option.Name.Value);
+        Assert.Equal("MASCULINO", option.NormalizedName);
+        Assert.Null(option.Description);
+        Assert.Null(option.SemanticText);
+        Assert.Equal(0, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Draft, option.Status);
+    }
+
+    [Fact]
+    public void Invalid_semantic_text_leaves_all_mutable_state_unchanged()
+    {
+        var option = CreateDraft(name: "Masculino");
+        var tooLong = new string('a', 2001);
+
+        Assert.Throws<ArgumentException>(() =>
+            option.Update(
+                new SegmentOptionName("Changed"),
+                option.Description,
+                tooLong,
+                50,
+                SegmentOptionStatus.Active));
+
+        Assert.Equal("Masculino", option.Name.Value);
+        Assert.Equal("MASCULINO", option.NormalizedName);
+        Assert.Null(option.Description);
+        Assert.Null(option.SemanticText);
+        Assert.Equal(0, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Draft, option.Status);
+    }
+
+    [Fact]
+    public void Valid_update_applies_all_requested_changes()
+    {
+        var option = CreateDraft(name: "Masculino");
+
+        option.Update(
+            new SegmentOptionName("Renamed"),
+            "New description",
+            "New semantic text",
+            30,
+            SegmentOptionStatus.Draft);
+
+        Assert.Equal("Renamed", option.Name.Value);
+        Assert.Equal("RENAMED", option.NormalizedName);
+        Assert.Equal("New description", option.Description);
+        Assert.Equal("New semantic text", option.SemanticText);
+        Assert.Equal(30, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Draft, option.Status);
+    }
+
+    [Fact]
+    public void Valid_update_with_valid_lifecycle_transition_applies_fields_and_status_together()
+    {
+        var option = CreateDraft(name: "Masculino");
+
+        option.Update(
+            new SegmentOptionName("Renamed"),
+            "New description",
+            "New semantic text",
+            30,
+            SegmentOptionStatus.Active);
+
+        Assert.Equal("Renamed", option.Name.Value);
+        Assert.Equal("RENAMED", option.NormalizedName);
+        Assert.Equal("New description", option.Description);
+        Assert.Equal("New semantic text", option.SemanticText);
+        Assert.Equal(30, option.DisplayOrder);
+        Assert.Equal(SegmentOptionStatus.Active, option.Status);
+    }
 }
