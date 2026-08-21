@@ -1,7 +1,7 @@
 ﻿# ADR-0012: Governed Product and Sku Mutation and Commercial Eligibility
 
 - **Status:** Accepted
-- **Date:** 2025-06-12
+- **Date:** 2026-08-20
 - **Decision Owners:** Yunu.Commerce Architecture
 - **Scope:** Catalog Bounded Context — `Product`, `Sku`
 
@@ -69,11 +69,11 @@ cannot live inside either Aggregate. They are enforced by
   at least one of its Skus is not `Archived`
   (`ISkuRepository.ExistsNonArchivedByProductIdAsync`), raising
   `ProductHasNonArchivedSkusException`.
-- **A Sku leaving `Archived`, or being (re)activated/blocked**, is blocked
-  while its owning Product is `Archived` (`TransitionSkuStatusHandler`
-  checks `IProductRepository.GetByIdAsync`), raising
-  `ProductArchivedException`. A Sku may still transition *to* `Archived`
-  regardless of its Product's status.
+- **A Sku transitioning to a non-Archived status** is blocked while its
+  owning Product is `Archived` (`TransitionSkuStatusHandler` checks
+  `IProductRepository.GetByIdAsync`), raising `ProductArchivedException`. A
+  Sku may still transition *to* `Archived` regardless of its Product's
+  status.
 - **Creating a Sku** under an `Archived` Product is blocked by
   `CreateSkuHandler`.
 
@@ -150,14 +150,17 @@ multi-document transaction (`session.WithTransactionAsync`) and, inside that
 transaction, conditionally increments the same field on the same Product
 document: `ProductDocument.LifecycleRevision`, an infrastructure-only token
 never mapped onto the Domain `Product` Aggregate. Because every competing
-operation must touch this same field on the same document before writing its
-own Aggregate, MongoDB allows only one of two concurrently racing
-transactions to commit; the loser's conditional update matches zero
-documents and the operation returns a normal coordination result
-(`ConcurrencyConflict`, `ProductArchived`, or `NonArchivedSkuExists`)
-instead of silently interleaving. `TransitionProductStatusHandler` and
-`TransitionSkuStatusHandler` translate a losing result directly into an
-exception (first-writer-wins); neither handler reloads the Aggregate and
+operation touches the same `LifecycleRevision` field on the same Product
+document, concurrent transactions cannot silently commit a write-skew state.
+The losing transaction either fails its conditional write against stale
+state or is transparently retried by the MongoDB driver (its built-in
+transient-transaction-error retry for the underlying "WriteConflict" case)
+and then observes the newly committed state, returning the corresponding
+coordination result such as `ConcurrencyConflict`, `ProductArchived`, or
+`NonArchivedSkuExists`, instead of silently interleaving.
+`TransitionProductStatusHandler` and `TransitionSkuStatusHandler` translate
+a losing result directly into an exception (first-writer-wins); neither
+handler reloads the Aggregate and
 retries the original command against newer state.
 
 This is a conditional-write coordination mechanism scoped to one
