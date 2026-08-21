@@ -15,4 +15,8 @@
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="CanonicalTaxonomy\UpdateCanonicalTaxonomyNode\" />
+  </ItemGroup>
+
 </Project>

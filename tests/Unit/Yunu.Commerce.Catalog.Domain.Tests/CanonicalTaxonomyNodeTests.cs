@@ -86,4 +86,21 @@ public class CanonicalTaxonomyNodeTests
         Assert.Throws<InvalidCanonicalTaxonomyNodeStatusTransitionException>(
             () => node.TransitionTo(CanonicalTaxonomyNodeStatus.Inactive));
     }
+
+    [Fact]
+    public void Update_on_archived_node_throws_and_does_not_mutate_state()
+    {
+        var node = CreateDraftRoot();
+        node.TransitionTo(CanonicalTaxonomyNodeStatus.Archived);
+        var eventCountBeforeUpdate = node.DomainEvents.Count;
+
+        Assert.Throws<CanonicalTaxonomyNodeArchivedException>(
+            () => node.Update("New Name", "new name", "New Description", "New Path"));
+
+        Assert.Equal("Root", node.Name);
+        Assert.Equal("root", node.NormalizedName);
+        Assert.Null(node.Description);
+        Assert.Equal("Root", node.Path);
+        Assert.Equal(eventCountBeforeUpdate, node.DomainEvents.Count);
+    }
 }

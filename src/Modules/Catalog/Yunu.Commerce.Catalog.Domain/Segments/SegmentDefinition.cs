@@ -214,17 +214,24 @@ public sealed class SegmentDefinition
         var normalizedDescription = NormalizeOptionalText(description, DescriptionMaxLength, nameof(description));
         var normalizedSemanticText = NormalizeOptionalText(semanticText, SemanticTextMaxLength, nameof(semanticText));
 
+        ValidateStatusTransition(status);
+
         Name = name;
         NormalizedName = SegmentTextNormalizer.Normalize(name.Value);
         Description = normalizedDescription;
         SemanticText = normalizedSemanticText;
         SelectionMode = selectionMode;
         AssignmentScope = assignmentScope;
-
-        TransitionTo(status);
+        Status = status;
     }
 
-    private void TransitionTo(SegmentDefinitionStatus newStatus)
+    /// <summary>
+    /// Side-effect-free validation of a requested Status transition. Does
+    /// not mutate any Aggregate state; must be called before any other
+    /// mutable field is assigned so that <see cref="Update"/> remains
+    /// atomic (all-or-nothing) from the caller's perspective.
+    /// </summary>
+    private void ValidateStatusTransition(SegmentDefinitionStatus newStatus)
     {
         if (newStatus == Status)
         {
@@ -236,8 +243,6 @@ public sealed class SegmentDefinition
             throw new InvalidSegmentDefinitionStatusTransitionException(
                 $"Cannot transition SegmentDefinition status from {Status} to {newStatus}.");
         }
-
-        Status = newStatus;
     }
 
     private static string? NormalizeOptionalText(string? value, int maxLength, string paramName)
