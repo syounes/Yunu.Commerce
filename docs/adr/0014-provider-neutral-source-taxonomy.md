@@ -87,16 +87,28 @@ are different concepts:
 - **Source taxonomy identity/provenance:** `ProviderCode`, `ScopeCode`,
   `ExternalTaxonomyId`, `ExternalVersion`, `ExternalNodeId`.
 - **Canonical provenance:** how a Canonical node was produced/curated (e.g.
-  Yunu/manual/AI/governed proposal semantics), represented today by
-  `CanonicalTaxonomySource` (`Catalog.Domain.CanonicalTaxonomy`:
-  `Yunu`, `Google`, `AI`).
+  Yunu/manual/AI/governed proposal semantics).
 
-The current `CanonicalTaxonomySource.Google` value is acknowledged as
-provider-specific technical debt to be revisited separately once
-`SourceTaxonomy` exists. This ADR does **not** redesign
-`CanonicalTaxonomySource`.
+**Update (docs task: "Canonical Taxonomy Provider Decoupling"):** the
+provider-identity/provenance coupling described above as technical debt has
+been removed. `CanonicalTaxonomyNode` no longer stores `GoogleCategoryId` or
+a `CanonicalTaxonomySource` (the enum has been deleted), and
+`Catalog.CanonicalTaxonomyNodes` no longer has `GoogleCategoryId` or `Source`
+columns (see
+`deploy/databases/sqlserver/013-remove-canonical-provider-coupling.sql`).
+`CanonicalTaxonomyNode` now represents only approved canonical catalog
+truth, with no knowledge of Google or any other upstream provider. This
+does not implement `SourceTaxonomy`; provider/source evidence for a
+canonical node still belongs to the future `SourceTaxonomy` /
+`SourceTaxonomyNode` model described below. Workflow provenance (e.g. AI
+proposal + human approval) remains out of scope for this Aggregate and
+belongs to future proposal/review metadata. `GoogleTaxonomy` itself
+(`Catalog.GoogleTaxonomyCategories`, `GoogleCategoryResolver`) is untouched
+by this change and continues to exist as a separate, provider-specific
+integration model.
 
 ## 3. Normalized Source Taxonomy Header (Planned)
+
 
 Planned normalized source descriptor table: `Catalog.SourceTaxonomies`.
 

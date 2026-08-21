@@ -16,8 +16,9 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 /// deploy/databases/sqlserver/006-create-canonical-taxonomy-segmentation.sql,
 /// deploy/databases/sqlserver/007-drop-legacy-catalog-hierarchy.sql,
 /// deploy/databases/sqlserver/008-add-segment-assignment-scope.sql,
-/// deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql and
-/// deploy/databases/sqlserver/012-add-canonical-taxonomy-concurrency-guard.sql
+/// deploy/databases/sqlserver/009-reset-canonical-taxonomy-starter.sql,
+/// deploy/databases/sqlserver/012-add-canonical-taxonomy-concurrency-guard.sql and
+/// deploy/databases/sqlserver/013-remove-canonical-provider-coupling.sql
 /// directly against the container. Migration 009 requires Google categories
 /// 166 ("Vestuário e acessórios") and 187 ("Sapatos") to already exist in
 /// Catalog.GoogleTaxonomyCategories with the expected pt-BR names/paths, so
@@ -41,6 +42,7 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
         await SeedGoogleTaxonomyCategoriesAsync(connectionString);
         await RunScriptAsync(connectionString, "009-reset-canonical-taxonomy-starter.sql");
         await RunScriptAsync(connectionString, "012-add-canonical-taxonomy-concurrency-guard.sql");
+        await RunScriptAsync(connectionString, "013-remove-canonical-provider-coupling.sql");
 
         var options = Options.Create(new GoogleTaxonomySqlOptions
         {
@@ -463,43 +465,6 @@ public sealed class SqlCanonicalTaxonomyRepositoryTests : IAsyncLifetime
 
         Assert.Equal("Catálogo Teste Avô > Vestuário e acessórios > Sapatos", persistedShoes!.Path);
         Assert.Equal(2, persistedShoes.Depth);
-    }
-
-    [Fact]
-    public void CreateRoot_With_Source_Google_And_No_GoogleCategoryId_Should_Throw()
-    {
-        Assert.Throws<ArgumentException>(() =>
-            CanonicalTaxonomyNode.CreateRoot(
-                new CanonicalTaxonomyNodeId(0),
-                "google-without-category",
-                "Categoria Google",
-                "categoria google",
-                null,
-                "Categoria Google",
-                googleCategoryId: null,
-                source: CanonicalTaxonomySource.Google,
-                status: CanonicalTaxonomyNodeStatus.Active));
-    }
-
-    [Fact]
-    public async Task GoogleCategoryId_Should_Be_Persisted_And_Rehydrated()
-    {
-        var node = CanonicalTaxonomyNode.CreateRoot(
-            new CanonicalTaxonomyNodeId(0),
-            "google-category-root",
-            "Categoria de Teste",
-            "categoria de teste",
-            null,
-            "Categoria de Teste",
-            googleCategoryId: 999001,
-            source: CanonicalTaxonomySource.Google,
-            status: CanonicalTaxonomyNodeStatus.Active);
-
-        var id = await _repository.AddAsync(node, CancellationToken.None);
-        var persisted = await _repository.GetByIdAsync(id, CancellationToken.None);
-
-        Assert.Equal(999001, persisted!.GoogleCategoryId);
-        Assert.Equal(CanonicalTaxonomySource.Google, persisted.Source);
     }
 
     [Fact]

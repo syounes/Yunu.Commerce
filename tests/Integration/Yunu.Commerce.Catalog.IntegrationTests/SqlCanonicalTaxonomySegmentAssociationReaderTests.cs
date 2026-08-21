@@ -22,8 +22,8 @@ namespace Yunu.Commerce.Catalog.IntegrationTests;
 ///
 /// Schema is created the same way as SqlCanonicalTaxonomyRepositoryTests and
 /// SqlSegmentDefinitionRepositoryTests, by executing
-/// deploy/databases/sqlserver/006, 007, 008, 009, 010, 011 and 012 directly
-/// against a Testcontainers SQL Server instance. Test data (nodes,
+/// deploy/databases/sqlserver/006, 007, 008, 009, 010, 011, 012 and 013
+/// directly against a Testcontainers SQL Server instance. Test data (nodes,
 /// definitions) is created through the legitimate repository/domain paths;
 /// only the CanonicalTaxonomyNodeSegmentDefinitions junction rows are
 /// inserted directly via SQL (there is no public write port for this
@@ -53,6 +53,7 @@ public sealed class SqlCanonicalTaxonomySegmentAssociationReaderTests : IAsyncLi
         await RunScriptAsync(_connectionString, "010-seed-canonical-taxonomy-node-segments.sql");
         await RunScriptAsync(_connectionString, "011-drop-segment-definitions-isrequired.sql");
         await RunScriptAsync(_connectionString, "012-add-canonical-taxonomy-concurrency-guard.sql");
+        await RunScriptAsync(_connectionString, "013-remove-canonical-provider-coupling.sql");
 
         var options = Options.Create(new GoogleTaxonomySqlOptions
         {

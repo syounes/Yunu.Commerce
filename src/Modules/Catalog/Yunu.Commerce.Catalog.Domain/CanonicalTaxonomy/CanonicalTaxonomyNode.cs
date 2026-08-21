@@ -51,6 +51,20 @@ public sealed class CanonicalTaxonomyNodeArchivedException : Exception
 /// relationship owned by Catalog.CanonicalTaxonomyNodeSegmentDefinitions and
 /// is not modeled here.
 ///
+/// Provider-neutrality (docs task: "Canonical Taxonomy Provider Decoupling";
+/// docs/adr/0014-provider-neutral-source-taxonomy.md): this Aggregate
+/// represents only approved canonical catalog truth and has no provider
+/// identity/provenance coupling. It does not know Google, Mercado Livre,
+/// Amazon or any other upstream provider, does not store an external/
+/// provider taxonomy node identifier, and does not record how the node was
+/// originally produced. A canonical node may eventually be supported by
+/// 0..N external source nodes, so no provider ID is stored directly on this
+/// Aggregate; that evidence belongs to the future SourceTaxonomy /
+/// SourceTaxonomyNode model. Workflow provenance (e.g. AI proposal + human
+/// approval) belongs to future proposal/review metadata, not to this
+/// Aggregate: storing "AI" on every materialized canonical row would be
+/// redundant and would mix workflow provenance with canonical state.
+///
 /// Lifecycle (docs task: "Yunu.Commerce V9 - Canonical Taxonomy Lifecycle +
 /// Usage Guards"): Status transitions follow the same shape as
 /// <see cref="Yunu.Commerce.Catalog.Domain.Segments.SegmentDefinition"/> and
@@ -79,8 +93,6 @@ public sealed class CanonicalTaxonomyNode
 
     public CanonicalTaxonomyNodeId? ParentId { get; }
 
-    public long? GoogleCategoryId { get; }
-
     public string Code { get; }
 
     public string Name { get; private set; }
@@ -93,8 +105,6 @@ public sealed class CanonicalTaxonomyNode
 
     public string Path { get; private set; }
 
-    public CanonicalTaxonomySource Source { get; }
-
     public CanonicalTaxonomyNodeStatus Status { get; private set; }
 
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents;
@@ -102,26 +112,22 @@ public sealed class CanonicalTaxonomyNode
     private CanonicalTaxonomyNode(
         CanonicalTaxonomyNodeId id,
         CanonicalTaxonomyNodeId? parentId,
-        long? googleCategoryId,
         string code,
         string name,
         string normalizedName,
         string? description,
         int depth,
         string path,
-        CanonicalTaxonomySource source,
         CanonicalTaxonomyNodeStatus status)
     {
         Id = id;
         ParentId = parentId;
-        GoogleCategoryId = googleCategoryId;
         Code = code;
         Name = name;
         NormalizedName = normalizedName;
         Description = description;
         Depth = depth;
         Path = path;
-        Source = source;
         Status = status;
     }
 
@@ -135,16 +141,13 @@ public sealed class CanonicalTaxonomyNode
         string normalizedName,
         string? description,
         string path,
-        long? googleCategoryId = null,
-        CanonicalTaxonomySource source = CanonicalTaxonomySource.Yunu,
         CanonicalTaxonomyNodeStatus status = CanonicalTaxonomyNodeStatus.Draft)
     {
         ValidateCommon(code, name, normalizedName, path);
-        ValidateGoogleSource(source, googleCategoryId);
 
         var node = new CanonicalTaxonomyNode(
-            id, null, googleCategoryId, code.Trim(), name.Trim(), normalizedName.Trim(),
-            description, 0, path.Trim(), source, status);
+            id, null, code.Trim(), name.Trim(), normalizedName.Trim(),
+            description, 0, path.Trim(), status);
 
         node._domainEvents.Add(new Events.CanonicalTaxonomyNodeCreatedDomainEvent(id));
 
@@ -166,12 +169,9 @@ public sealed class CanonicalTaxonomyNode
         string? description,
         int depth,
         string path,
-        long? googleCategoryId = null,
-        CanonicalTaxonomySource source = CanonicalTaxonomySource.Yunu,
         CanonicalTaxonomyNodeStatus status = CanonicalTaxonomyNodeStatus.Draft)
     {
         ValidateCommon(code, name, normalizedName, path);
-        ValidateGoogleSource(source, googleCategoryId);
 
         if (parentId == id)
         {
@@ -184,8 +184,8 @@ public sealed class CanonicalTaxonomyNode
         }
 
         var node = new CanonicalTaxonomyNode(
-            id, parentId, googleCategoryId, code.Trim(), name.Trim(), normalizedName.Trim(),
-            description, depth, path.Trim(), source, status);
+            id, parentId, code.Trim(), name.Trim(), normalizedName.Trim(),
+            description, depth, path.Trim(), status);
 
         node._domainEvents.Add(new Events.CanonicalTaxonomyNodeCreatedDomainEvent(id));
 
@@ -200,19 +200,17 @@ public sealed class CanonicalTaxonomyNode
     public static CanonicalTaxonomyNode Hydrate(
         CanonicalTaxonomyNodeId id,
         CanonicalTaxonomyNodeId? parentId,
-        long? googleCategoryId,
         string code,
         string name,
         string normalizedName,
         string? description,
         int depth,
         string path,
-        CanonicalTaxonomySource source,
         CanonicalTaxonomyNodeStatus status)
     {
         return new CanonicalTaxonomyNode(
-            id, parentId, googleCategoryId, code, name, normalizedName,
-            description, depth, path, source, status);
+            id, parentId, code, name, normalizedName,
+            description, depth, path, status);
     }
 
     /// <summary>
@@ -311,14 +309,6 @@ public sealed class CanonicalTaxonomyNode
         if (string.IsNullOrWhiteSpace(path))
         {
             throw new ArgumentException("Path cannot be null, empty or whitespace.", nameof(path));
-        }
-    }
-
-    private static void ValidateGoogleSource(CanonicalTaxonomySource source, long? googleCategoryId)
-    {
-        if (source == CanonicalTaxonomySource.Google && googleCategoryId is null)
-        {
-            throw new ArgumentException("A node with Source = Google must have a GoogleCategoryId.", nameof(googleCategoryId));
         }
     }
 }
