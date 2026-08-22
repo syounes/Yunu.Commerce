@@ -10,9 +10,24 @@ namespace Yunu.Commerce.Catalog.Application.Tests.SourceTaxonomy;
 public sealed class FakeSourceTaxonomyImportStore : ISourceTaxonomyImportStore
 {
     private long _nextImportId = 1;
+    private readonly Exception? _markFailedException;
+
+    public FakeSourceTaxonomyImportStore()
+    {
+    }
+
+    /// <summary>
+    /// Simulates MarkFailedAsync itself failing (e.g. a secondary DB
+    /// failure), used to prove the original exception is never masked.
+    /// </summary>
+    public FakeSourceTaxonomyImportStore(Exception markFailedException)
+    {
+        _markFailedException = markFailedException;
+    }
 
     public List<(long ImportId, long SourceTaxonomyId, string AdapterCode)> StartedImports { get; } = new();
     public List<(long ImportId, string ErrorMessage)> FailedImports { get; } = new();
+    public List<CancellationToken> MarkFailedCancellationTokens { get; } = new();
 
     public Task<long> StartAsync(
         long sourceTaxonomyId,
@@ -30,6 +45,13 @@ public sealed class FakeSourceTaxonomyImportStore : ISourceTaxonomyImportStore
 
     public Task MarkFailedAsync(long importId, string errorMessage, DateTime completedAtUtc, CancellationToken cancellationToken)
     {
+        MarkFailedCancellationTokens.Add(cancellationToken);
+
+        if (_markFailedException is not null)
+        {
+            throw _markFailedException;
+        }
+
         FailedImports.Add((importId, errorMessage));
         return Task.CompletedTask;
     }

@@ -8,11 +8,14 @@
 /// read/create repository does not become a synchronization kitchen sink.
 ///
 /// The Started row must survive even when the synchronization transaction
-/// that follows it fails; therefore <see cref="StartAsync"/>,
+/// that follows it fails; therefore <see cref="StartAsync"/> and
 /// <see cref="MarkFailedAsync"/> commit independently of the synchronization
-/// transaction, while <see cref="CompleteAsync"/> is expected to be invoked
-/// by the SQL synchronization store from inside the same transaction that
-/// applies the header/node changes (§12).
+/// transaction. This interface intentionally does NOT expose a
+/// CompleteAsync method: completion is performed by
+/// <see cref="ISourceTaxonomySynchronizationStore"/> from inside the same
+/// atomic SQL transaction that applies the header/node changes (§12), so a
+/// Completed import row can never be observed if that transaction rolls
+/// back.
 /// </summary>
 public interface ISourceTaxonomyImportStore
 {

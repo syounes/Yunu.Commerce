@@ -558,6 +558,336 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
             reader.GetString(5));
     }
 
+    private async Task<(string? SourceUri, string? ExternalVersion, string? SourceChecksum)> GetImportSnapshotMetadataAsync(long importId)
+    {
+        const string sql = """
+            SELECT SourceUri, ExternalVersion, SourceChecksum
+            FROM Integration.SourceTaxonomyImports
+            WHERE ImportId = @ImportId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@ImportId", importId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+
+        return (
+            reader.IsDBNull(0) ? null : reader.GetString(0),
+            reader.IsDBNull(1) ? null : reader.GetString(1),
+            reader.IsDBNull(2) ? null : reader.GetString(2));
+    }
+
+    /// <summary>
+    /// Directly mutates the persisted ScopeCode/ExternalTaxonomyId under the
+    /// same UPDLOCK path the store uses, simulating a concurrent process
+    /// having already committed a conflicting enrichment between the
+    /// orchestrator's descriptor read and the synchronization transaction
+    /// (audit item 7A/7B: cross-process stale-read race).
+    /// </summary>
+    private async Task SetPersistedScopeAndExternalIdAsync(long sourceTaxonomyId, string? scopeCode, string? externalTaxonomyId)
+    {
+        const string sql = """
+            UPDATE Catalog.SourceTaxonomies
+            SET ScopeCode = @ScopeCode,
+                ExternalTaxonomyId = @ExternalTaxonomyId
+            WHERE SourceTaxonomyId = @SourceTaxonomyId
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@SourceTaxonomyId", sourceTaxonomyId);
+        command.Parameters.AddWithValue("@ScopeCode", (object?)scopeCode ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ExternalTaxonomyId", (object?)externalTaxonomyId ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    [Fact]
+    public async Task LockedScopeCodeConflict_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("locked-scope-conflict");
+
+        // Simulate a concurrent process committing ScopeCode=BR AFTER the
+        // orchestrator would have read the descriptor (the descriptor read
+        // itself is not modeled here since it happens inside ImportAsync;
+        // we set the persisted state before the call so the locked read
+        // inside the transaction observes the conflicting value).
+        await SetPersistedScopeAndExternalIdAsync(sourceId, "BR", null);
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1") with { ScopeCode = "US" },
+            Nodes = new[] { Node("1") }
+        };
+
+        await Assert.ThrowsAsync<SourceTaxonomyScopeConflictException>(
+            () => CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None));
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.Equal("BR", descriptor!.ScopeCode);
+    }
+
+    [Fact]
+    public async Task LockedExternalTaxonomyIdConflict_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("locked-external-id-conflict");
+
+        await SetPersistedScopeAndExternalIdAsync(sourceId, null, "ext-committed");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1") with { ExternalTaxonomyId = "ext-other" },
+            Nodes = new[] { Node("1") }
+        };
+
+        await Assert.ThrowsAsync<SourceTaxonomyExternalTaxonomyIdConflictException>(
+            () => CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None));
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.Equal("ext-committed", descriptor!.ExternalTaxonomyId);
+    }
+
+    [Fact]
+    public async Task SynchronizationFailure_After_Work_Began_Should_Rollback_All_Changes_And_Mark_Import_Failed()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("sync-failure-rollback");
+
+        // The first node passes structural validation and is inserted
+        // successfully, but the second node's FullPath exceeds the
+        // NVARCHAR(2000) column width, causing a genuine SQL failure AFTER
+        // synchronization work (the first node insert) has already begun
+        // inside the transaction.
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[]
+            {
+                Node("1", name: "First", fullPath: "Root"),
+                Node("2", name: "Second", fullPath: new string('x', 2500))
+            }
+        };
+
+        var orchestrator = CreateOrchestrator(FakeAdapter("fake", _ => snapshot));
+
+        await Assert.ThrowsAnyAsync<Exception>(
+            () => orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None));
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.Null(descriptor!.SourceChecksum);
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+        Assert.Equal("Failed", importRow.Status);
+    }
+
+    [Fact]
+    public async Task CompletedImportHistory_Should_Contain_Snapshot_SourceUri_ExternalVersion_Checksum()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("completed-history-metadata");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = new SourceTaxonomySnapshotDescriptor
+            {
+                ProviderCode = "fake-provider",
+                Locale = "pt-BR",
+                ExternalVersion = "snapshot-version-42",
+                SourceUri = "https://example.com/snapshot-actual",
+                SourceChecksum = "snapshot-checksum-actual"
+            },
+            Nodes = new[] { Node("1") }
+        };
+
+        var result = await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var metadata = await GetImportSnapshotMetadataAsync(result.ImportId);
+
+        Assert.Equal("https://example.com/snapshot-actual", metadata.SourceUri);
+        Assert.Equal("snapshot-version-42", metadata.ExternalVersion);
+        Assert.Equal("snapshot-checksum-actual", metadata.SourceChecksum);
+    }
+
+    [Fact]
+    public async Task FirstImport_With_Null_Prior_Metadata_Should_Persist_New_Snapshot_Metadata_In_History()
+    {
+        // CreateSourceTaxonomyAsync seeds SourceUri/ExternalVersion/SourceChecksum = null.
+        var sourceId = await CreateSourceTaxonomyAsync("first-import-null-prior");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "first-checksum") with { ExternalVersion = "first-version", SourceUri = "https://example.com/first" },
+            Nodes = new[] { Node("1") }
+        };
+
+        var result = await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var metadata = await GetImportSnapshotMetadataAsync(result.ImportId);
+
+        Assert.Equal("https://example.com/first", metadata.SourceUri);
+        Assert.Equal("first-version", metadata.ExternalVersion);
+        Assert.Equal("first-checksum", metadata.SourceChecksum);
+    }
+
+    [Fact]
+    public async Task ErrorMessage_Should_Never_Exceed_2000_Characters()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("error-message-bound");
+
+        var hugeMessage = new string('x', 5000);
+        var orchestrator = CreateOrchestrator(new ThrowingSourceTaxonomyAdapter("fake", new InvalidOperationException(hugeMessage)));
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None));
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+
+        Assert.NotNull(importRow.ErrorMessage);
+        Assert.True(importRow.ErrorMessage!.Length <= 2000);
+    }
+
+    [Fact]
+    public async Task NullOrBlankChecksum_Should_Never_Use_Checksum_Skip_And_Always_Synchronize()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("null-checksum-no-skip");
+
+        var first = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: null),
+            Nodes = new[] { Node("1", name: "Name A") }
+        };
+        await CreateOrchestrator(FakeAdapter("fake", _ => first)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        // A null/blank checksum must never trigger the checksum-skip
+        // optimization, so a changed node name is always applied even
+        // though nothing about the "checksum" changed (it stays null).
+        var second = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: null),
+            Nodes = new[] { Node("1", name: "Name B") }
+        };
+        var result = await CreateOrchestrator(FakeAdapter("fake", _ => second)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        Assert.Equal(1, result.UpdatedCount);
+
+        var node = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "1", CancellationToken.None);
+        Assert.Equal("Name B", node!.Name);
+    }
+
+    [Fact]
+    public async Task ChecksumEqual_With_Unchanged_Metadata_Should_Refresh_ImportedAt_But_Not_UpdatedAt()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("checksum-equal-updatedat");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "stable-checksum"),
+            Nodes = new[] { Node("1") }
+        };
+
+        await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var afterFirst = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        var updatedAtAfterFirst = afterFirst!.UpdatedAt;
+        var importedAtAfterFirst = afterFirst.ImportedAt;
+
+        await Task.Delay(50);
+
+        await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var afterSecond = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+
+        Assert.True(afterSecond!.ImportedAt > importedAtAfterFirst);
+        Assert.Equal(updatedAtAfterFirst, afterSecond.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task Code_Name_ProviderCode_Should_Remain_Immutable_Across_Synchronization()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("full-identity-immutable", providerCode: "fake-provider");
+        var before = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[] { Node("1") }
+        };
+
+        await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var after = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+
+        Assert.Equal(before!.Code, after!.Code);
+        Assert.Equal(before.Name, after.Name);
+        Assert.Equal(before.ProviderCode, after.ProviderCode);
+    }
+
+    [Fact]
+    public async Task ParentExternalNodeId_Should_Remain_Import_Only_With_No_Persistence_Column()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("parent-external-node-id-not-persisted");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[]
+            {
+                Node("parent"),
+                Node("child", parentExternalNodeId: "parent", level: 1)
+            }
+        };
+
+        await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        const string sql = """
+            SELECT COUNT(*)
+            FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'Catalog.SourceTaxonomyNodes')
+              AND name = N'ParentExternalNodeId'
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        var count = (int)(await command.ExecuteScalarAsync())!;
+
+        Assert.Equal(0, count);
+    }
+
+    private async Task<long> GetLatestFailedImportIdAsync(long sourceTaxonomyId)
+    {
+        const string sql = """
+            SELECT TOP 1 ImportId
+            FROM Integration.SourceTaxonomyImports
+            WHERE SourceTaxonomyId = @SourceTaxonomyId AND Status = 'Failed'
+            ORDER BY ImportId DESC
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@SourceTaxonomyId", sourceTaxonomyId);
+
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
     private sealed class DelegateSourceTaxonomyAdapter : ISourceTaxonomyAdapter
     {
         private readonly Func<SourceTaxonomyImportContext, SourceTaxonomySnapshot> _snapshotFactory;

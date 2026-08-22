@@ -130,7 +130,22 @@ public sealed class SourceTaxonomyImportOrchestrator
         {
             _logger.LogError(ex, "SourceTaxonomy import {ImportId} failed for SourceTaxonomy {SourceTaxonomyId}", importId, sourceTaxonomyId);
 
-            await _importStore.MarkFailedAsync(importId, SanitizeErrorMessage(ex), DateTime.UtcNow, cancellationToken);
+            // Best-effort failure persistence. A cancelled caller token must
+            // never prevent recording the failure, and a secondary failure
+            // while marking the import Failed must never replace/mask the
+            // original exception (docs/adr/0014-provider-neutral-source-taxonomy.md §12/§19).
+            try
+            {
+                await _importStore.MarkFailedAsync(importId, SanitizeErrorMessage(ex), DateTime.UtcNow, CancellationToken.None);
+            }
+            catch (Exception markFailedEx)
+            {
+                _logger.LogError(
+                    markFailedEx,
+                    "Failed to record SourceTaxonomy import {ImportId} as Failed after the original failure for SourceTaxonomy {SourceTaxonomyId}",
+                    importId,
+                    sourceTaxonomyId);
+            }
 
             throw;
         }

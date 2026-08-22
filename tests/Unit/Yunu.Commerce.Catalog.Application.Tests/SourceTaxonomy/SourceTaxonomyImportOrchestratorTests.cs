@@ -281,6 +281,58 @@ public class SourceTaxonomyImportOrchestratorTests
     }
 
     [Fact]
+    public async Task ImportAsync_When_MarkFailedAsync_Throws_Should_Preserve_Original_Exception()
+    {
+        var repository = new FakeSourceTaxonomyRepository();
+        repository.Seed(Descriptor());
+
+        var originalException = new InvalidOperationException("original failure");
+        var adapter = new FakeSourceTaxonomyAdapter("adapter", originalException);
+
+        var markFailedException = new TimeoutException("secondary failure while marking failed");
+        var importStore = new FakeSourceTaxonomyImportStore(markFailedException);
+
+        var orchestrator = CreateOrchestrator(
+            repository,
+            new[] { adapter },
+            importStore,
+            new FakeSourceTaxonomySynchronizationStore(SuccessResult()));
+
+        var observed = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => orchestrator.ImportAsync(1, "adapter", CancellationToken.None));
+
+        Assert.Same(originalException, observed);
+    }
+
+    [Fact]
+    public async Task ImportAsync_With_AlreadyCancelledToken_After_Started_Should_Still_Attempt_Failure_Cleanup()
+    {
+        var repository = new FakeSourceTaxonomyRepository();
+        repository.Seed(Descriptor());
+
+        var adapter = new FakeSourceTaxonomyAdapter("adapter", new InvalidOperationException("boom"));
+        var importStore = new FakeSourceTaxonomyImportStore();
+
+        var orchestrator = CreateOrchestrator(
+            repository,
+            new[] { adapter },
+            importStore,
+            new FakeSourceTaxonomySynchronizationStore(SuccessResult()));
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => orchestrator.ImportAsync(1, "adapter", cts.Token));
+
+        // Failure cleanup must not be skipped merely because the caller
+        // token is already cancelled: the persisted Started row must be
+        // marked Failed using a cleanup-safe token.
+        Assert.Single(importStore.FailedImports);
+        Assert.All(importStore.MarkFailedCancellationTokens, token => Assert.False(token.IsCancellationRequested));
+    }
+
+    [Fact]
     public async Task ImportAsync_Should_Return_Synchronization_Counts_On_Success()
     {
         var repository = new FakeSourceTaxonomyRepository();

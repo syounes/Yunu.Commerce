@@ -1,5 +1,6 @@
 ﻿using Microsoft.Data.SqlClient;
 using Yunu.Commerce.Catalog.Application.SourceTaxonomy.Import;
+using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 
@@ -13,7 +14,12 @@ namespace Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 /// Design:
 /// 1. Locks the target Catalog.SourceTaxonomies row (UPDLOCK, ROWLOCK) so the
 ///    checksum-skip decision (§16) and header update are serialized safely
-///    against concurrent synchronization of the SAME SourceTaxonomy.
+///    against concurrent synchronization of the SAME SourceTaxonomy. The
+///    locked row's ProviderCode/ScopeCode/ExternalTaxonomyId/IsActive are
+///    then REVALIDATED against the snapshot: this is the authoritative
+///    identity check (the Application-level check on the pre-transaction
+///    descriptor is only a fast-feedback pre-check and cannot, by itself,
+///    prevent a cross-process stale-read race).
 /// 2. If the locked row's SourceChecksum equals the snapshot checksum (both
 ///    non-blank), skips node synchronization entirely and only refreshes
 ///    header metadata + import history.
@@ -25,7 +31,12 @@ namespace Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 ///    the persisted set but absent from the snapshot are deactivated, never
 ///    hard deleted.
 /// 4. Marks the pre-existing (Started) import row Completed from inside this
-///    same transaction, so a Completed row can never survive a rollback.
+///    same transaction, so a Completed row can never survive a rollback, and
+///    persists the SourceUri/ExternalVersion/SourceChecksum actually
+///    imported (not the stale pre-import descriptor values).
+/// 5. On failure, rollback is best-effort using a cleanup-safe token (never
+///    the caller's, which may already be cancelled) and never masks the
+///    original synchronization exception.
 /// </summary>
 public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynchronizationStore
 {
@@ -52,6 +63,12 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         try
         {
             var currentSource = await LoadAndLockSourceAsync(connection, transaction, sourceTaxonomyId, cancellationToken);
+
+            // The locked transaction state is authoritative (§1): repeat the
+            // identity checks against the CURRENT row under UPDLOCK/ROWLOCK,
+            // not the pre-transaction descriptor read, to close the
+            // cross-process stale-read race described in the audit.
+            ValidateLockedIdentity(sourceTaxonomyId, currentSource, snapshot.Descriptor);
 
             var canSkipByChecksum =
                 !string.IsNullOrWhiteSpace(currentSource.SourceChecksum)
@@ -95,16 +112,61 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
                 };
             }
 
-            await CompleteImportAsync(connection, transaction, importId, result, cancellationToken);
+            await CompleteImportAsync(connection, transaction, importId, snapshot.Descriptor, result, cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
 
             return result;
         }
-        catch
+        catch (Exception ex)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            // Rollback must be best-effort: a cancelled caller token must
+            // never prevent rolling back partially-applied changes, and a
+            // failure during rollback must never replace/mask the original
+            // synchronization exception (§3).
+            try
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            catch (Exception rollbackEx)
+            {
+                throw new AggregateException(
+                    "SourceTaxonomy synchronization failed and the subsequent rollback also failed. See InnerExceptions for both the original failure and the rollback failure.",
+                    ex,
+                    rollbackEx);
+            }
+
             throw;
+        }
+    }
+
+    private static void ValidateLockedIdentity(
+        long sourceTaxonomyId,
+        CurrentSourceRow currentSource,
+        SourceTaxonomySnapshotDescriptor snapshotDescriptor)
+    {
+        if (!currentSource.IsActive)
+        {
+            throw new SourceTaxonomyInactiveException(sourceTaxonomyId);
+        }
+
+        if (!string.Equals(currentSource.ProviderCode, snapshotDescriptor.ProviderCode, StringComparison.Ordinal))
+        {
+            throw new SourceTaxonomyProviderMismatchException(currentSource.ProviderCode, snapshotDescriptor.ProviderCode);
+        }
+
+        if (currentSource.ScopeCode is not null
+            && snapshotDescriptor.ScopeCode is not null
+            && !string.Equals(currentSource.ScopeCode, snapshotDescriptor.ScopeCode, StringComparison.Ordinal))
+        {
+            throw new SourceTaxonomyScopeConflictException(currentSource.ScopeCode, snapshotDescriptor.ScopeCode);
+        }
+
+        if (currentSource.ExternalTaxonomyId is not null
+            && snapshotDescriptor.ExternalTaxonomyId is not null
+            && !string.Equals(currentSource.ExternalTaxonomyId, snapshotDescriptor.ExternalTaxonomyId, StringComparison.Ordinal))
+        {
+            throw new SourceTaxonomyExternalTaxonomyIdConflictException(currentSource.ExternalTaxonomyId, snapshotDescriptor.ExternalTaxonomyId);
         }
     }
 
@@ -115,7 +177,8 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT ScopeCode, ExternalTaxonomyId, SourceChecksum
+            SELECT ProviderCode, ScopeCode, ExternalTaxonomyId, ExternalVersion,
+                   DefaultLanguage, SourceUri, SourceChecksum, IsActive
             FROM Catalog.SourceTaxonomies WITH (UPDLOCK, ROWLOCK)
             WHERE SourceTaxonomyId = @SourceTaxonomyId
             """;
@@ -131,9 +194,14 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         }
 
         return new CurrentSourceRow(
-            ScopeCode: reader.IsDBNull(0) ? null : reader.GetString(0),
-            ExternalTaxonomyId: reader.IsDBNull(1) ? null : reader.GetString(1),
-            SourceChecksum: reader.IsDBNull(2) ? null : reader.GetString(2));
+            ProviderCode: reader.GetString(0),
+            ScopeCode: reader.IsDBNull(1) ? null : reader.GetString(1),
+            ExternalTaxonomyId: reader.IsDBNull(2) ? null : reader.GetString(2),
+            ExternalVersion: reader.IsDBNull(3) ? null : reader.GetString(3),
+            DefaultLanguage: reader.GetString(4),
+            SourceUri: reader.IsDBNull(5) ? null : reader.GetString(5),
+            SourceChecksum: reader.IsDBNull(6) ? null : reader.GetString(6),
+            IsActive: reader.GetBoolean(7));
     }
 
     private static async Task<(int Inserted, int Updated, int Deactivated)> SynchronizeNodesAsync(
@@ -418,18 +486,42 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         var scopeCode = currentSource.ScopeCode ?? snapshotDescriptor.ScopeCode;
         var externalTaxonomyId = currentSource.ExternalTaxonomyId ?? snapshotDescriptor.ExternalTaxonomyId;
 
-        const string sql = """
-            UPDATE Catalog.SourceTaxonomies
-            SET ScopeCode = @ScopeCode,
-                ExternalTaxonomyId = @ExternalTaxonomyId,
-                ExternalVersion = @ExternalVersion,
-                DefaultLanguage = @DefaultLanguage,
-                SourceUri = @SourceUri,
-                SourceChecksum = @SourceChecksum,
-                ImportedAt = @ImportedAt,
-                UpdatedAt = @Now
-            WHERE SourceTaxonomyId = @SourceTaxonomyId
-            """;
+        // UpdatedAt reflects meaningful persisted metadata changes only
+        // (§5). ImportedAt is refreshed for every successful import
+        // regardless of whether metadata changed, so a repeated observation
+        // of an unchanged source is never mistaken for a metadata edit.
+        var metadataChanged =
+            !string.Equals(currentSource.ScopeCode, scopeCode, StringComparison.Ordinal) ||
+            !string.Equals(currentSource.ExternalTaxonomyId, externalTaxonomyId, StringComparison.Ordinal) ||
+            currentSource.ExternalVersion != snapshotDescriptor.ExternalVersion ||
+            currentSource.DefaultLanguage != snapshotDescriptor.Locale ||
+            currentSource.SourceUri != snapshotDescriptor.SourceUri ||
+            currentSource.SourceChecksum != snapshotDescriptor.SourceChecksum;
+
+        var sql = metadataChanged
+            ? """
+                UPDATE Catalog.SourceTaxonomies
+                SET ScopeCode = @ScopeCode,
+                    ExternalTaxonomyId = @ExternalTaxonomyId,
+                    ExternalVersion = @ExternalVersion,
+                    DefaultLanguage = @DefaultLanguage,
+                    SourceUri = @SourceUri,
+                    SourceChecksum = @SourceChecksum,
+                    ImportedAt = @ImportedAt,
+                    UpdatedAt = @Now
+                WHERE SourceTaxonomyId = @SourceTaxonomyId
+                """
+            : """
+                UPDATE Catalog.SourceTaxonomies
+                SET ScopeCode = @ScopeCode,
+                    ExternalTaxonomyId = @ExternalTaxonomyId,
+                    ExternalVersion = @ExternalVersion,
+                    DefaultLanguage = @DefaultLanguage,
+                    SourceUri = @SourceUri,
+                    SourceChecksum = @SourceChecksum,
+                    ImportedAt = @ImportedAt
+                WHERE SourceTaxonomyId = @SourceTaxonomyId
+                """;
 
         await using var command = new SqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("@SourceTaxonomyId", sourceTaxonomyId);
@@ -440,7 +532,11 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         command.Parameters.AddWithValue("@SourceUri", (object?)snapshotDescriptor.SourceUri ?? DBNull.Value);
         command.Parameters.AddWithValue("@SourceChecksum", (object?)snapshotDescriptor.SourceChecksum ?? DBNull.Value);
         command.Parameters.AddWithValue("@ImportedAt", importedAtUtc);
-        command.Parameters.AddWithValue("@Now", DateTime.UtcNow);
+
+        if (metadataChanged)
+        {
+            command.Parameters.AddWithValue("@Now", DateTime.UtcNow);
+        }
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -449,9 +545,13 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         SqlConnection connection,
         SqlTransaction transaction,
         long importId,
+        SourceTaxonomySnapshotDescriptor snapshotDescriptor,
         SourceTaxonomySynchronizationResult result,
         CancellationToken cancellationToken)
     {
+        // Import history must describe the snapshot actually imported (§4),
+        // not the pre-import descriptor captured by StartAsync. AdapterCode
+        // and StartedAt are left untouched from the Started row.
         const string sql = """
             UPDATE Integration.SourceTaxonomyImports
             SET CompletedAt = @CompletedAt,
@@ -460,7 +560,10 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
                 UpdatedCount = @UpdatedCount,
                 DeactivatedCount = @DeactivatedCount,
                 Status = 'Completed',
-                ErrorMessage = NULL
+                ErrorMessage = NULL,
+                SourceUri = @SourceUri,
+                ExternalVersion = @ExternalVersion,
+                SourceChecksum = @SourceChecksum
             WHERE ImportId = @ImportId
             """;
 
@@ -471,11 +574,22 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         command.Parameters.AddWithValue("@InsertedCount", result.InsertedCount);
         command.Parameters.AddWithValue("@UpdatedCount", result.UpdatedCount);
         command.Parameters.AddWithValue("@DeactivatedCount", result.DeactivatedCount);
+        command.Parameters.AddWithValue("@SourceUri", (object?)snapshotDescriptor.SourceUri ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ExternalVersion", (object?)snapshotDescriptor.ExternalVersion ?? DBNull.Value);
+        command.Parameters.AddWithValue("@SourceChecksum", (object?)snapshotDescriptor.SourceChecksum ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private sealed record CurrentSourceRow(string? ScopeCode, string? ExternalTaxonomyId, string? SourceChecksum);
+    private sealed record CurrentSourceRow(
+        string ProviderCode,
+        string? ScopeCode,
+        string? ExternalTaxonomyId,
+        string? ExternalVersion,
+        string DefaultLanguage,
+        string? SourceUri,
+        string? SourceChecksum,
+        bool IsActive);
 
     private sealed record ExistingNodeRow(
         long SourceTaxonomyNodeId,
