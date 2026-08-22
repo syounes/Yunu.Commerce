@@ -132,10 +132,11 @@ public static class CatalogInfrastructureServiceCollectionExtensions
             return new SqlSourceTaxonomyRepository(connectionString);
         });
 
-        // SourceTaxonomy Phase 3: generic import orchestration infrastructure
-        // (docs/adr/0014-provider-neutral-source-taxonomy.md §9-§18). No concrete
-        // ISourceTaxonomyAdapter is registered here; adapters are provider-specific
-        // and belong to a later phase.
+        // SourceTaxonomy Phase 3: generic, provider-neutral import orchestration
+        // infrastructure (docs/adr/0014-provider-neutral-source-taxonomy.md §9-§18).
+        // Phase 4 (below) registers the first concrete ISourceTaxonomyAdapter
+        // (GoogleSourceTaxonomyAdapter); all Google-specific knowledge remains
+        // inside that adapter, and this generic infrastructure stays provider-agnostic.
         services.AddSingleton<ISourceTaxonomyImportStore>(sp =>
         {
             var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
@@ -148,11 +149,14 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         });
         services.AddSingleton<ISourceTaxonomyImportGuard, InMemorySourceTaxonomyImportGuard>();
 
-        // SourceTaxonomy Phase 4: first concrete provider adapter. Translates the
-        // existing persisted Google Product Taxonomy into a provider-neutral
-        // SourceTaxonomySnapshot (docs/adr/0014-provider-neutral-source-taxonomy.md
-        // §9-§10). Reuses the same GoogleTaxonomySqlOptions connection as the
-        // native Google pipeline; introduces no new configuration section.
+        // SourceTaxonomy Phase 4: first concrete provider adapter, resolved purely
+        // via ISourceTaxonomyAdapter.AdapterCode by the generic
+        // SourceTaxonomyImportOrchestrator (no provider branching added to the
+        // orchestrator itself). Translates the existing persisted Google Product
+        // Taxonomy into a provider-neutral SourceTaxonomySnapshot
+        // (docs/adr/0014-provider-neutral-source-taxonomy.md §9-§10). Reuses the
+        // same GoogleTaxonomySqlOptions connection as the native Google pipeline;
+        // introduces no new configuration section.
         services.AddSingleton<ISourceTaxonomyAdapter, GoogleSourceTaxonomyAdapter>();
 
         return services;

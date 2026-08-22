@@ -105,6 +105,19 @@ public sealed class GoogleSourceTaxonomyAdapter : ISourceTaxonomyAdapter
             ?? throw new SourceTaxonomySnapshotValidationException("The persisted Google taxonomy dataset is empty; no SourceLanguage could be determined.");
     }
 
+    /// <summary>
+    /// Deterministic locale compatibility rule for SourceTaxonomy identity
+    /// (docs task: "Final Audit Corrections Before PR" §4). Two locales are
+    /// compatible only when:
+    /// (A) they are exactly equal, ignoring case; or
+    /// (B) exactly one side is a primary-language-only value (no region
+    /// subtag) and its primary language matches the other side's primary
+    /// language.
+    /// When BOTH sides carry an explicit region subtag, they must match
+    /// exactly; "en-US" and "en-GB" (or "pt-BR" and "pt-PT") are NOT
+    /// compatible. This intentionally does not implement a general
+    /// localization/negotiation framework.
+    /// </summary>
     private static bool IsLocaleCompatible(string defaultLanguage, string locale)
     {
         if (string.Equals(defaultLanguage, locale, StringComparison.OrdinalIgnoreCase))
@@ -112,11 +125,22 @@ public sealed class GoogleSourceTaxonomyAdapter : ISourceTaxonomyAdapter
             return true;
         }
 
+        var defaultHasRegion = HasRegionSubtag(defaultLanguage);
+        var localeHasRegion = HasRegionSubtag(locale);
+
+        if (defaultHasRegion && localeHasRegion)
+        {
+            // Both are specific locales but did not match exactly above.
+            return false;
+        }
+
         var defaultPrimary = PrimarySubtag(defaultLanguage);
         var localePrimary = PrimarySubtag(locale);
 
         return string.Equals(defaultPrimary, localePrimary, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static bool HasRegionSubtag(string language) => language.Contains('-');
 
     private static string PrimarySubtag(string language)
     {

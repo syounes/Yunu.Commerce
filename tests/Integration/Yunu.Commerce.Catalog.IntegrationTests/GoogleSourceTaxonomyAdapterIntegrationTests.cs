@@ -171,6 +171,53 @@ public sealed class GoogleSourceTaxonomyAdapterIntegrationTests : IAsyncLifetime
         return (int)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>
+    /// Test-only read model for the complete native Google row, used solely to
+    /// prove exhaustive structural parity against the normalized
+    /// SourceTaxonomy dataset. Distinct from the adapter's own private read
+    /// model; this one lives in the test project.
+    /// </summary>
+    private sealed record NativeGoogleCategoryRow(
+        int GoogleCategoryId,
+        int? ParentGoogleCategoryId,
+        string Name,
+        string FullPath,
+        int Level,
+        bool IsLeaf,
+        bool IsActive,
+        string SourceLanguage);
+
+    private async Task<IReadOnlyCollection<NativeGoogleCategoryRow>> LoadAllGoogleNativeRowsAsync()
+    {
+        const string sql = """
+            SELECT GoogleCategoryId, ParentGoogleCategoryId, Name, FullPath, Level, IsLeaf, IsActive, SourceLanguage
+            FROM [Catalog].[GoogleTaxonomyCategories]
+            """;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync();
+
+        var results = new List<NativeGoogleCategoryRow>();
+
+        while (await reader.ReadAsync())
+        {
+            results.Add(new NativeGoogleCategoryRow(
+                GoogleCategoryId: reader.GetInt32(0),
+                ParentGoogleCategoryId: reader.IsDBNull(1) ? null : reader.GetInt32(1),
+                Name: reader.GetString(2),
+                FullPath: reader.GetString(3),
+                Level: reader.GetInt32(4),
+                IsLeaf: reader.GetBoolean(5),
+                IsActive: reader.GetBoolean(6),
+                SourceLanguage: reader.GetString(7)));
+        }
+
+        return results;
+    }
+
     [Fact]
     public async Task AdapterCode_Is_Exactly_GoogleProductTaxonomy()
     {
@@ -178,7 +225,7 @@ public sealed class GoogleSourceTaxonomyAdapterIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Import_Should_Achieve_Structural_Parity_With_Google_Native_Data()
+    public async Task Import_Should_Achieve_Exhaustive_Node_By_Node_Structural_Parity_With_Google_Native_Data()
     {
         await SeedRepresentativeGoogleTaxonomyAsync();
 
@@ -187,59 +234,66 @@ public sealed class GoogleSourceTaxonomyAdapterIntegrationTests : IAsyncLifetime
         var orchestrator = CreateOrchestrator();
         var result = await orchestrator.ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None);
 
-        Assert.Equal(6, result.NodeCount);
-        Assert.Equal(6, result.InsertedCount);
+        var nativeRows = await LoadAllGoogleNativeRowsAsync();
 
-        // 1. Row count parity.
-        var nativeCount = await GetGoogleNativeRowCountAsync();
-        Assert.Equal(6, nativeCount);
-        Assert.Equal(nativeCount, result.NodeCount);
+        // 1. Row count parity: every native row has exactly one normalized counterpart.
+        Assert.Equal(nativeRows.Count, result.NodeCount);
+        Assert.Equal(nativeRows.Count, result.InsertedCount);
 
-        // 2/3/4/5/6/7. Field-level + parent-relationship parity for every node.
-        var root1 = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "1", CancellationToken.None);
-        var clothing = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "2", CancellationToken.None);
-        var shirts = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "3", CancellationToken.None);
-        var discontinuedPants = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "4", CancellationToken.None);
-        var root2 = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "5", CancellationToken.None);
-        var cameras = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, "6", CancellationToken.None);
+        var normalizedNodes = new Dictionary<string, SourceTaxonomyNodeRecord>(StringComparer.Ordinal);
+        var normalizedById = new Dictionary<long, SourceTaxonomyNodeRecord>();
 
-        Assert.NotNull(root1);
-        Assert.NotNull(clothing);
-        Assert.NotNull(shirts);
-        Assert.NotNull(discontinuedPants);
-        Assert.NotNull(root2);
-        Assert.NotNull(cameras);
+        foreach (var nativeRow in nativeRows)
+        {
+            var externalNodeId = nativeRow.GoogleCategoryId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var normalizedNode = await _sourceRepository.GetNodeByExternalIdAsync(sourceId, externalNodeId, CancellationToken.None);
 
-        Assert.Null(root1!.ParentSourceTaxonomyNodeId);
-        Assert.Equal(root1.SourceTaxonomyNodeId, clothing!.ParentSourceTaxonomyNodeId);
-        Assert.Equal(clothing.SourceTaxonomyNodeId, shirts!.ParentSourceTaxonomyNodeId);
-        Assert.Equal(clothing.SourceTaxonomyNodeId, discontinuedPants!.ParentSourceTaxonomyNodeId);
-        Assert.Null(root2!.ParentSourceTaxonomyNodeId);
-        Assert.Equal(root2.SourceTaxonomyNodeId, cameras!.ParentSourceTaxonomyNodeId);
+            Assert.NotNull(normalizedNode);
 
-        Assert.Equal("Apparel & Accessories", root1.Name);
-        Assert.Equal("Apparel & Accessories", root1.FullPath);
-        Assert.Equal(0, root1.Level);
-        Assert.False(root1.IsLeaf);
-        Assert.True(root1.IsActive);
+            normalizedNodes[externalNodeId] = normalizedNode!;
+            normalizedById[normalizedNode!.SourceTaxonomyNodeId] = normalizedNode;
+        }
 
-        Assert.Equal("Shirts", shirts.Name);
-        Assert.Equal("Apparel & Accessories > Clothing > Shirts", shirts.FullPath);
-        Assert.Equal(2, shirts.Level);
-        Assert.True(shirts.IsLeaf);
-        Assert.True(shirts.IsActive);
+        // 2-9. Exhaustive scalar + parent-relationship parity for EVERY native row,
+        // not just a representative subset.
+        foreach (var nativeRow in nativeRows)
+        {
+            var externalNodeId = nativeRow.GoogleCategoryId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var normalizedNode = normalizedNodes[externalNodeId];
 
-        // 8. Inactive node preservation.
-        Assert.Equal("Discontinued Pants", discontinuedPants.Name);
-        Assert.False(discontinuedPants.IsActive);
+            Assert.Equal(nativeRow.Name, normalizedNode.Name);
+            Assert.Equal(nativeRow.FullPath, normalizedNode.FullPath);
+            Assert.Equal(nativeRow.Level, normalizedNode.Level);
+            Assert.Equal(nativeRow.IsLeaf, normalizedNode.IsLeaf);
+            Assert.Equal(nativeRow.IsActive, normalizedNode.IsActive);
+            Assert.Equal(nativeRow.SourceLanguage, normalizedNode.SourceLanguage);
+            Assert.Equal("Category", normalizedNode.NodeType);
 
-        // 9. SourceLanguage / snapshot locale parity.
-        Assert.Equal("en-US", root1.SourceLanguage);
-        Assert.Equal("en-US", discontinuedPants.SourceLanguage);
+            if (nativeRow.ParentGoogleCategoryId is null)
+            {
+                Assert.Null(normalizedNode.ParentSourceTaxonomyNodeId);
+            }
+            else
+            {
+                Assert.NotNull(normalizedNode.ParentSourceTaxonomyNodeId);
 
-        // Multiple roots supported, no single-root rule.
+                var normalizedParent = normalizedById[normalizedNode.ParentSourceTaxonomyNodeId!.Value];
+                var expectedParentExternalNodeId = nativeRow.ParentGoogleCategoryId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+                Assert.Equal(expectedParentExternalNodeId, normalizedParent.ExternalNodeId);
+            }
+        }
+
+        // Explicit inactive-node preservation proof (not implied by the loop above alone).
+        Assert.Contains(nativeRows, row => !row.IsActive);
+        var inactiveExternalId = nativeRows.First(row => !row.IsActive).GoogleCategoryId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        Assert.False(normalizedNodes[inactiveExternalId].IsActive);
+
+        // Explicit multiple-roots proof: no single-root rule applied.
         var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
-        Assert.Equal(2, roots.Count);
+        var nativeRootCount = nativeRows.Count(row => row.ParentGoogleCategoryId is null);
+        Assert.True(nativeRootCount >= 2);
+        Assert.Equal(nativeRootCount, roots.Count);
     }
 
     [Fact]
@@ -304,5 +358,75 @@ public sealed class GoogleSourceTaxonomyAdapterIntegrationTests : IAsyncLifetime
 
         await Assert.ThrowsAsync<GoogleSourceTaxonomyLanguageMismatchException>(
             () => CreateOrchestrator().ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Import_With_Inconsistent_SourceLanguage_Dataset_Should_Fail_And_Leave_No_Side_Effects()
+    {
+        // Node A in en-US, node B in pt-BR: no single consistent locale can be
+        // determined, so the adapter must reject the dataset outright.
+        await InsertGoogleCategoryAsync(1, null, "Root A", "Root A", 0, isLeaf: true, isActive: true, sourceLanguage: "en-US");
+        await InsertGoogleCategoryAsync(2, null, "Root B", "Root B", 0, isLeaf: true, isActive: true, sourceLanguage: "pt-BR");
+
+        var beforeCount = await GetGoogleNativeRowCountAsync();
+
+        var sourceId = await CreateSourceTaxonomyAsync("inconsistent-language");
+
+        await Assert.ThrowsAsync<GoogleSourceTaxonomyInconsistentLanguageException>(
+            () => CreateOrchestrator().ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None));
+
+        // No SourceTaxonomy node synchronization must have occurred.
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        // The generic orchestrator's import history must record the failure.
+        var afterCount = await GetGoogleNativeRowCountAsync();
+        Assert.Equal(beforeCount, afterCount);
+    }
+
+    [Theory]
+    [InlineData("en", "en-US")]
+    [InlineData("en-US", "en")]
+    [InlineData("pt", "pt-BR")]
+    [InlineData("pt-BR", "pt")]
+    public async Task Import_With_Generic_Primary_Language_Vs_Specific_Locale_Should_Be_Accepted(
+        string defaultLanguage,
+        string googleSourceLanguage)
+    {
+        await InsertGoogleCategoryAsync(1, null, "Root", "Root", 0, isLeaf: true, isActive: true, sourceLanguage: googleSourceLanguage);
+
+        var sourceId = await CreateSourceTaxonomyAsync($"generic-locale-{defaultLanguage}-{googleSourceLanguage}", defaultLanguage: defaultLanguage);
+
+        var result = await CreateOrchestrator().ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None);
+
+        Assert.Equal(1, result.NodeCount);
+    }
+
+    [Theory]
+    [InlineData("en-US", "en-GB")]
+    [InlineData("pt-BR", "pt-PT")]
+    [InlineData("zh-CN", "zh-TW")]
+    public async Task Import_With_Different_Specific_Locales_Should_Be_Rejected(
+        string defaultLanguage,
+        string googleSourceLanguage)
+    {
+        await InsertGoogleCategoryAsync(1, null, "Root", "Root", 0, isLeaf: true, isActive: true, sourceLanguage: googleSourceLanguage);
+
+        var sourceId = await CreateSourceTaxonomyAsync($"specific-locale-{defaultLanguage}-{googleSourceLanguage}", defaultLanguage: defaultLanguage);
+
+        await Assert.ThrowsAsync<GoogleSourceTaxonomyLanguageMismatchException>(
+            () => CreateOrchestrator().ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Import_With_Exact_Locale_Case_Insensitive_Match_Should_Be_Accepted()
+    {
+        await InsertGoogleCategoryAsync(1, null, "Root", "Root", 0, isLeaf: true, isActive: true, sourceLanguage: "en-US");
+
+        var sourceId = await CreateSourceTaxonomyAsync("case-insensitive-locale", defaultLanguage: "EN-us");
+
+        var result = await CreateOrchestrator().ImportAsync(sourceId, GoogleSourceTaxonomyAdapter.GoogleAdapterCode, CancellationToken.None);
+
+        Assert.Equal(1, result.NodeCount);
     }
 }
