@@ -1,7 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Options;
 using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
-using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 
 namespace Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 
@@ -17,19 +15,20 @@ namespace Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 /// provider adapter, import orchestration, upsert or deactivation logic is
 /// implemented here; those belong to a later phase.
 ///
-/// The connection string is sourced from <see cref="GoogleTaxonomySqlOptions"/>,
-/// which is the existing (if unfortunately named) shared Catalog SQL Server
-/// connection source reused by every other Catalog SQL repository. This
-/// class depends only on the connection string value, not on the Google-
-/// specific option type's name/semantics, to avoid deepening the coupling.
+/// This class depends only on a plain SQL connection string, not on any
+/// Google-specific (or other provider-specific) configuration type. The
+/// existing shared Catalog SQL connection source naming debt
+/// (GoogleTaxonomySqlOptions) is isolated to the composition root
+/// (CatalogInfrastructureServiceCollectionExtensions).
 /// </summary>
 public sealed class SqlSourceTaxonomyRepository : ISourceTaxonomyRepository
 {
     private readonly string _connectionString;
 
-    public SqlSourceTaxonomyRepository(IOptions<GoogleTaxonomySqlOptions> options)
+    public SqlSourceTaxonomyRepository(string connectionString)
     {
-        _connectionString = options.Value.ConnectionString;
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        _connectionString = connectionString;
     }
 
     public async Task<long> CreateAsync(SourceTaxonomyCreateRecord source, CancellationToken cancellationToken)

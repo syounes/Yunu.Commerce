@@ -1,9 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Options;
 using Testcontainers.MsSql;
 using Xunit;
 using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
-using Yunu.Commerce.Catalog.Infrastructure.GoogleTaxonomy.Persistence.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 
 namespace Yunu.Commerce.Catalog.IntegrationTests;
@@ -31,12 +29,7 @@ public sealed class SqlSourceTaxonomyRepositoryTests : IAsyncLifetime
 
         await RunScriptAsync(_connectionString, "014-create-source-taxonomy-foundation.sql");
 
-        var options = Options.Create(new GoogleTaxonomySqlOptions
-        {
-            ConnectionString = _connectionString
-        });
-
-        _repository = new SqlSourceTaxonomyRepository(options);
+        _repository = new SqlSourceTaxonomyRepository(_connectionString);
     }
 
     public async Task DisposeAsync()

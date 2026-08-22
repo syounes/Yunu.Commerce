@@ -118,9 +118,16 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<ISegmentEmbeddingSynchronizationGuard, InMemorySegmentEmbeddingSynchronizationGuard>();
 
         // SourceTaxonomy is provider-neutral imported/reference data (docs/adr/0014).
-        // Reuses the existing shared Catalog SQL connection source (GoogleTaxonomySqlOptions)
-        // rather than introducing a second SQL connection string/config section.
-        services.AddSingleton<ISourceTaxonomyRepository, SqlSourceTaxonomyRepository>();
+        // SqlSourceTaxonomyRepository depends only on a plain connection string, never
+        // on GoogleTaxonomySqlOptions directly. The legacy naming debt of reusing the
+        // Google-named options type as the shared Catalog SQL connection source is
+        // isolated to this composition root rather than leaking into SourceTaxonomy
+        // Infrastructure.
+        services.AddSingleton<ISourceTaxonomyRepository>(sp =>
+        {
+            var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
+            return new SqlSourceTaxonomyRepository(connectionString);
+        });
 
         return services;
     }
