@@ -36,23 +36,27 @@ contain provider `if` branches (`if Google`, `if MercadoLivre`, `if Amazon`,
 
 ## 2. Decision
 
-This ADR freezes a **future, not-yet-implemented** normalization boundary
-named `SourceTaxonomy`, planned as an Anti-Corruption Layer (ADR-0001)
-between provider-native taxonomy models and Yunu `CanonicalTaxonomy` /
-semantic resolution.
+This ADR freezes a normalization boundary named `SourceTaxonomy`, an
+Anti-Corruption Layer (ADR-0001) between provider-native taxonomy models and
+Yunu `CanonicalTaxonomy` / semantic resolution. As of Phase 3 (§21), the
+normalization boundary itself — the SQL Server schema, provider-neutral
+Application contracts, the adapter contract, and generic import
+orchestration/synchronization — is implemented. Concrete provider adapters
+(e.g. `GoogleSourceTaxonomyAdapter`) and semantic resolution remain future
+work.
 
-The planned architecture is conceptually:
+The architecture is conceptually:
 
 ```
 Provider-native taxonomy
         ↓
-Provider Adapter (e.g. GoogleSourceTaxonomyAdapter — planned)
+Provider Adapter (e.g. GoogleSourceTaxonomyAdapter — future)
         ↓
-SourceTaxonomy (planned normalized model)
+SourceTaxonomy (implemented normalized model)
         ↓
-generic semantic search / resolver (planned)
+generic semantic search / resolver (future)
         ↓
-CanonicalTaxonomy proposal/resolution (planned)
+CanonicalTaxonomy proposal/resolution (future)
 ```
 
 `SourceTaxonomy` is **not** merely a rename of `GoogleTaxonomy`.
@@ -107,10 +111,10 @@ belongs to future proposal/review metadata. `GoogleTaxonomy` itself
 by this change and continues to exist as a separate, provider-specific
 integration model.
 
-## 3. Normalized Source Taxonomy Header (Planned)
+## 3. Normalized Source Taxonomy Header (Implemented)
 
-
-Planned normalized source descriptor table: `Catalog.SourceTaxonomies`.
+Implemented normalized source descriptor table: `Catalog.SourceTaxonomies`
+(`deploy/databases/sqlserver/014-create-source-taxonomy-foundation.sql`).
 
 Conceptual fields:
 
@@ -140,9 +144,9 @@ universe is open-ended. Examples: `google`, `mercadolivre`, `amazon`,
 introduced. Examples of `ScopeCode` values: `MLB`, `EBAY_US`, an Amazon
 marketplace identifier, or a customer catalog scope.
 
-## 4. Normalized Tree Model (Planned)
+## 4. Normalized Tree Model (Implemented)
 
-Planned normalized tree table: `Catalog.SourceTaxonomyNodes`.
+Implemented normalized tree table: `Catalog.SourceTaxonomyNodes`.
 
 Conceptual fields:
 
@@ -163,7 +167,7 @@ UpdatedAt                     DATETIME2, nullable
 ImportedAt                    DATETIME2
 ```
 
-Core invariants planned for this table:
+Core invariants implemented for this table:
 
 - `UNIQUE(SourceTaxonomyId, ExternalNodeId)`.
 - FK `SourceTaxonomyId -> SourceTaxonomies`.
@@ -199,8 +203,8 @@ different source taxonomies may reuse the same external identifier.
 
 The normalized core model does not persist a second external-parent identity
 alongside the internal parent FK. Adapter snapshots may expose
-`ParentExternalNodeId` during import; the planned generic synchronizer
-resolves hierarchy in two passes:
+`ParentExternalNodeId` during import; the implemented generic synchronizer
+(`SqlSourceTaxonomySynchronizationStore`) resolves hierarchy in two passes:
 
 1. Upsert normalized nodes and resolve internal identities.
 2. Resolve `ParentExternalNodeId` → `ParentSourceTaxonomyNodeId`.
@@ -208,10 +212,10 @@ resolves hierarchy in two passes:
 Only `ParentSourceTaxonomyNodeId` is persisted as the normalized tree
 relationship, avoiding two competing parent-consistency surfaces.
 
-## 8. Source Import History (Planned)
+## 8. Source Import History (Implemented)
 
-Planned generic import history table:
-`Integration.SourceTaxonomyImports`, with fields conceptually including:
+Implemented generic import history table:
+`Integration.SourceTaxonomyImports`, with fields including:
 
 ```
 ImportId
@@ -233,9 +237,9 @@ ErrorMessage
 This generalizes behavior conceptually similar to the provider-specific
 import tracking already present for `GoogleTaxonomy`.
 
-## 9. Adapter Boundary (Planned)
+## 9. Adapter Boundary (Implemented)
 
-Planned conceptual provider adapter contract:
+Implemented provider adapter contract (`ISourceTaxonomyAdapter`):
 
 ```
 ISourceTaxonomyAdapter
@@ -247,11 +251,13 @@ LoadAsync(
 
 returning a normalized `SourceTaxonomySnapshot`.
 
-Snapshot descriptor concept: `ProviderCode`, `ScopeCode`,
-`ExternalTaxonomyId`, `Version`, `Locale`, `Checksum`.
+Implemented snapshot descriptor (`SourceTaxonomySnapshotDescriptor`):
+`ProviderCode`, `ScopeCode`, `ExternalTaxonomyId`, `ExternalVersion`,
+`Locale`, `SourceChecksum`.
 
-Snapshot node concept: `ExternalNodeId`, `ParentExternalNodeId`, `NodeType`,
-`Name`, `FullPath`, `Level`, `IsLeaf`, `IsActive`.
+Implemented snapshot node (`SourceTaxonomySnapshotNode`): `ExternalNodeId`,
+`ParentExternalNodeId`, `NodeType`, `Name`, `FullPath`, `Level`, `IsLeaf`,
+`IsActive`.
 
 Adapters translate provider-native data; a generic `SourceTaxonomy`
 synchronizer owns persistence. Provider parsing logic must not be placed
@@ -451,9 +457,10 @@ human governance where required
 `if MercadoLivre`, `if Amazon`, ...). Provider-specific semantics must
 terminate at adapters / `SourceTaxonomy` normalization.
 
-## 20. Implementation Sequence (Planned, Not Implemented by This ADR)
+## 20. Implementation Sequence
 
-The intended staged implementation sequence, at a high level:
+The staged implementation sequence, at a high level (see §21 for current
+status):
 
 1. SQL Server `SourceTaxonomy` schema.
 2. `SourceTaxonomy` contracts and SQL persistence/readers.
@@ -468,12 +475,47 @@ The intended staged implementation sequence, at a high level:
 10. Implement `SourceTaxonomyResolver`.
 11. Run the Google resolver parity gate (§17).
 12. Migrate orchestrator/runtime consumers.
-13. Retire the obsolete Google-specific resolver layer, only after parity.
 
-This sequence is architectural guidance. ADR-0014 does not implement any
-step of it.
+## 21. Implementation Status
 
-## 21. Consequences
+Implemented:
+
+- Phase 1 SQL Server foundation (§3-§4, §8;
+  `deploy/databases/sqlserver/014-create-source-taxonomy-foundation.sql`);
+- Phase 2 Application contracts + SQL persistence/readers
+  (`Application.SourceTaxonomy`, `SqlSourceTaxonomyRepository`);
+- Phase 3 provider-neutral adapter contract + generic import orchestration
+  (`Application.SourceTaxonomy.Import`: `ISourceTaxonomyAdapter`,
+  `SourceTaxonomyImportContext`, `SourceTaxonomySnapshot`,
+  `SourceTaxonomySnapshotValidator`, `SourceTaxonomyImportOrchestrator`,
+  `ISourceTaxonomyImportStore`, `ISourceTaxonomySynchronizationStore`,
+  `ISourceTaxonomyImportGuard`; SQL Server implementations:
+  `SqlSourceTaxonomyImportStore`, `SqlSourceTaxonomySynchronizationStore`,
+  `InMemorySourceTaxonomyImportGuard`). Two-pass hierarchy resolution (§7,
+  §14), checksum-based unchanged-snapshot skip (§16), source-identity safety
+  checks (§8) and Started/Completed/Failed import history lifecycle (§8,
+  §11-§12) are implemented and covered by real SQL Server integration tests.
+  No concrete provider adapter exists yet; production adapter registration is
+  intentionally empty.
+
+Still pending:
+
+- concrete Google adapter (`GoogleSourceTaxonomyAdapter`);
+- non-Google proof (e.g. Mercado Livre);
+- schema freeze;
+- pgvector `SourceTaxonomy` projection;
+- `SourceTaxonomy` embedding synchronization;
+- generic semantic search / `SourceTaxonomyResolver`;
+- Google resolver parity gate and consumer migration (§17);
+- consumer migration;
+- retirement of the obsolete Google-specific resolver layer (only after
+  parity, §17);
+- `CanonicalTaxonomyResolve` (§19).
+
+This sequence is architectural guidance beyond Phase 3. Phases 1-3 (§21) are
+implemented; steps 4 onward remain future work.
+
+## 22. Consequences
 
 **Positive:**
 
@@ -501,29 +543,27 @@ step of it.
 - External attribute systems need a separate future normalization model
   (§11).
 
-## 22. Explicitly Not Changed
+## 23. Explicitly Not Changed
 
-This ADR does **not**:
+The Phase 3 implementation described in §21 does **not**:
 
-- implement `SourceTaxonomy` tables;
-- implement adapters;
-- implement Mercado Livre integration;
-- implement Amazon integration;
-- implement pgvector tables for `SourceTaxonomy`;
-- generate embeddings;
-- implement `SourceTaxonomyResolver`;
-- change `GoogleTaxonomy` ingestion;
+- implement a concrete `GoogleSourceTaxonomyAdapter`;
+- integrate Mercado Livre, Amazon, eBay, Shopify, Walmart, or any other
+  non-Google upstream provider;
+- create a pgvector `SourceTaxonomy` projection;
+- generate `SourceTaxonomy` embeddings;
+- implement `SourceTaxonomyResolver` or any generic semantic search;
+- change `GoogleTaxonomy` ingestion/synchronization;
 - remove `GoogleCategoryResolver`;
 - remove `google_taxonomy_embeddings`;
-- change `CanonicalTaxonomySource`;
 - implement `CanonicalTaxonomyResolve`;
 - implement `ProductProposal` materialization;
-- change `SegmentDefinitions`;
-- change `SegmentOptions`;
 - change `Product`/`Sku`;
-- add public mutation APIs.
+- change `SegmentDefinitions`/`SegmentOptions`;
+- create public mutation APIs for `SourceTaxonomy`;
+- reintroduce provider identity into `CanonicalTaxonomy`.
 
-## 23. Related Decisions
+## 24. Related Decisions
 
 - docs/adr/0001-use-ddd-clean-hexagonal.md
 - docs/adr/0007-use-elasticsearch-for-search-projections.md
