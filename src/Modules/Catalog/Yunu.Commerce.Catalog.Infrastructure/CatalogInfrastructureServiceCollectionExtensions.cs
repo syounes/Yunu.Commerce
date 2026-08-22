@@ -39,7 +39,6 @@ using Yunu.Commerce.Catalog.Infrastructure.SegmentCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.Synchronization.InMemory;
-using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.Google;
 using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.Synchronization.InMemory;
 
@@ -147,13 +146,6 @@ public static class CatalogInfrastructureServiceCollectionExtensions
             return new SqlSourceTaxonomySynchronizationStore(connectionString);
         });
         services.AddSingleton<ISourceTaxonomyImportGuard, InMemorySourceTaxonomyImportGuard>();
-
-        // SourceTaxonomy Phase 4: first concrete provider adapter. Translates the
-        // existing persisted Google Product Taxonomy into a provider-neutral
-        // SourceTaxonomySnapshot (docs/adr/0014-provider-neutral-source-taxonomy.md
-        // §9-§10). Reuses the same GoogleTaxonomySqlOptions connection as the
-        // native Google pipeline; introduces no new configuration section.
-        services.AddSingleton<ISourceTaxonomyAdapter, GoogleSourceTaxonomyAdapter>();
 
         return services;
     }
