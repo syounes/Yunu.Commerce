@@ -14,6 +14,7 @@ using Yunu.Commerce.Catalog.Application.GoogleTaxonomy.SynchronizeGoogleTaxonomy
 using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Application.SegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
+using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.ProductProposals;
@@ -37,6 +38,7 @@ using Yunu.Commerce.Catalog.Infrastructure.SegmentCatalog.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.Synchronization.InMemory;
+using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;
 
@@ -114,6 +116,18 @@ public static class CatalogInfrastructureServiceCollectionExtensions
         services.AddSingleton<ISegmentEmbeddingRepository, PostgreSqlSegmentEmbeddingRepository>();
         services.Configure<SegmentEmbeddingsSyncOptions>(configuration.GetSection("Catalog:SegmentEmbeddings"));
         services.AddSingleton<ISegmentEmbeddingSynchronizationGuard, InMemorySegmentEmbeddingSynchronizationGuard>();
+
+        // SourceTaxonomy is provider-neutral imported/reference data (docs/adr/0014).
+        // SqlSourceTaxonomyRepository depends only on a plain connection string, never
+        // on GoogleTaxonomySqlOptions directly. The legacy naming debt of reusing the
+        // Google-named options type as the shared Catalog SQL connection source is
+        // isolated to this composition root rather than leaking into SourceTaxonomy
+        // Infrastructure.
+        services.AddSingleton<ISourceTaxonomyRepository>(sp =>
+        {
+            var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
+            return new SqlSourceTaxonomyRepository(connectionString);
+        });
 
         return services;
     }
