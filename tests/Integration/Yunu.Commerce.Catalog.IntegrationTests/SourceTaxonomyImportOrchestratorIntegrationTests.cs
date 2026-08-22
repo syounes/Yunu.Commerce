@@ -1,4 +1,5 @@
 ﻿using Microsoft.Data.SqlClient;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Testcontainers.MsSql;
 using Xunit;
@@ -582,18 +583,38 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
     }
 
     /// <summary>
-    /// Directly mutates the persisted ScopeCode/ExternalTaxonomyId under the
-    /// same UPDLOCK path the store uses, simulating a concurrent process
-    /// having already committed a conflicting enrichment between the
-    /// orchestrator's descriptor read and the synchronization transaction
-    /// (audit item 7A/7B: cross-process stale-read race).
+    /// Direct-SQL mutation helpers used ONLY to simulate a second process
+    /// committing a persisted-state change to Catalog.SourceTaxonomies
+    /// AFTER the orchestrator under test has already read its (now stale)
+    /// descriptor, but BEFORE the synchronization transaction acquires its
+    /// UPDLOCK/ROWLOCK. Each test pairs these with
+    /// <see cref="BlockingSourceTaxonomyAdapter"/> to make the interleaving
+    /// deterministic instead of relying on Task.Delay timing (audit item
+    /// 7A-7D: cross-process stale-read race).
     /// </summary>
-    private async Task SetPersistedScopeAndExternalIdAsync(long sourceTaxonomyId, string? scopeCode, string? externalTaxonomyId)
+    private async Task SetPersistedScopeCodeAsync(long sourceTaxonomyId, string? scopeCode)
+        => await ExecuteDirectSqlAsync(
+            "UPDATE Catalog.SourceTaxonomies SET ScopeCode = @Value WHERE SourceTaxonomyId = @SourceTaxonomyId",
+            sourceTaxonomyId,
+            scopeCode);
+
+    private async Task SetPersistedExternalTaxonomyIdAsync(long sourceTaxonomyId, string? externalTaxonomyId)
+        => await ExecuteDirectSqlAsync(
+            "UPDATE Catalog.SourceTaxonomies SET ExternalTaxonomyId = @Value WHERE SourceTaxonomyId = @SourceTaxonomyId",
+            sourceTaxonomyId,
+            externalTaxonomyId);
+
+    private async Task SetPersistedProviderCodeAsync(long sourceTaxonomyId, string providerCode)
+        => await ExecuteDirectSqlAsync(
+            "UPDATE Catalog.SourceTaxonomies SET ProviderCode = @Value WHERE SourceTaxonomyId = @SourceTaxonomyId",
+            sourceTaxonomyId,
+            providerCode);
+
+    private async Task SetPersistedIsActiveAsync(long sourceTaxonomyId, bool isActive)
     {
         const string sql = """
             UPDATE Catalog.SourceTaxonomies
-            SET ScopeCode = @ScopeCode,
-                ExternalTaxonomyId = @ExternalTaxonomyId
+            SET IsActive = @IsActive
             WHERE SourceTaxonomyId = @SourceTaxonomyId
             """;
 
@@ -602,23 +623,50 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
 
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.AddWithValue("@SourceTaxonomyId", sourceTaxonomyId);
-        command.Parameters.AddWithValue("@ScopeCode", (object?)scopeCode ?? DBNull.Value);
-        command.Parameters.AddWithValue("@ExternalTaxonomyId", (object?)externalTaxonomyId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IsActive", isActive);
 
         await command.ExecuteNonQueryAsync();
     }
 
+    private async Task ExecuteDirectSqlAsync(string sql, long sourceTaxonomyId, string? value)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@SourceTaxonomyId", sourceTaxonomyId);
+        command.Parameters.AddWithValue("@Value", (object?)value ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync();
+    }
+
+    // --- Finding 1: deterministic transaction-time locked identity revalidation races ---
+    //
+    // Each test below uses BlockingSourceTaxonomyAdapter to force the following
+    // exact interleaving, so the race is proven deterministically rather than
+    // via timing:
+    //
+    //   1. ImportAsync starts, reads the (still-original) descriptor.
+    //   2. Started import-history row is created.
+    //   3. adapter.LoadAsync is entered and blocks; the test awaits Entered,
+    //      confirming the orchestrator already captured the stale descriptor
+    //      into the SourceTaxonomyImportContext.
+    //   4. The test mutates Catalog.SourceTaxonomies from a second SQL
+    //      connection, committing a conflicting value.
+    //   5. The test releases the adapter; LoadAsync returns the snapshot.
+    //   6. Application-level ValidateSourceIdentity runs against the STALE
+    //      descriptor and must NOT reject the snapshot (proving the
+    //      exception cannot come from the pre-transaction fast-check).
+    //   7. The synchronization transaction begins, LoadAndLockSourceAsync
+    //      reads the CURRENT (mutated) row under UPDLOCK/ROWLOCK, and
+    //      ValidateLockedIdentity throws the authoritative identity exception.
+    //   8. No nodes are inserted, no header mutation survives, and the
+    //      Started import row is recorded as Failed.
+
     [Fact]
     public async Task LockedScopeCodeConflict_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
     {
-        var sourceId = await CreateSourceTaxonomyAsync("locked-scope-conflict");
-
-        // Simulate a concurrent process committing ScopeCode=BR AFTER the
-        // orchestrator would have read the descriptor (the descriptor read
-        // itself is not modeled here since it happens inside ImportAsync;
-        // we set the persisted state before the call so the locked read
-        // inside the transaction observes the conflicting value).
-        await SetPersistedScopeAndExternalIdAsync(sourceId, "BR", null);
+        var sourceId = await CreateSourceTaxonomyAsync("locked-scope-conflict-race");
 
         var snapshot = new SourceTaxonomySnapshot
         {
@@ -626,37 +674,155 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
             Nodes = new[] { Node("1") }
         };
 
-        await Assert.ThrowsAsync<SourceTaxonomyScopeConflictException>(
-            () => CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None));
+        var adapter = new BlockingSourceTaxonomyAdapter("fake", _ => snapshot);
+        var orchestrator = CreateOrchestrator(adapter);
+
+        var importTask = orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        // The orchestrator has entered LoadAsync: it already captured the
+        // stale descriptor (ScopeCode = NULL) into the import context.
+        await adapter.Entered;
+        Assert.NotNull(adapter.CapturedContext);
+        Assert.Null(adapter.CapturedContext!.ScopeCode);
+
+        // A concurrent process commits a conflicting ScopeCode AFTER the
+        // orchestrator's descriptor read.
+        await SetPersistedScopeCodeAsync(sourceId, "BR");
+
+        adapter.Release();
+
+        // The stale descriptor (ScopeCode = NULL) can never conflict with the
+        // snapshot's ScopeCode under ValidateSourceIdentity's null-tolerant
+        // comparison, so this exception can only originate from the
+        // authoritative, transaction-time, locked-row revalidation.
+        await Assert.ThrowsAsync<SourceTaxonomyScopeConflictException>(() => importTask);
 
         var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
         Assert.Empty(roots);
 
         var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
         Assert.Equal("BR", descriptor!.ScopeCode);
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+        Assert.Equal("Failed", importRow.Status);
     }
 
     [Fact]
     public async Task LockedExternalTaxonomyIdConflict_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
     {
-        var sourceId = await CreateSourceTaxonomyAsync("locked-external-id-conflict");
-
-        await SetPersistedScopeAndExternalIdAsync(sourceId, null, "ext-committed");
+        var sourceId = await CreateSourceTaxonomyAsync("locked-external-id-conflict-race");
 
         var snapshot = new SourceTaxonomySnapshot
         {
-            Descriptor = Descriptor(checksum: "c1") with { ExternalTaxonomyId = "ext-other" },
+            Descriptor = Descriptor(checksum: "c1") with { ExternalTaxonomyId = "taxonomy-new" },
             Nodes = new[] { Node("1") }
         };
 
-        await Assert.ThrowsAsync<SourceTaxonomyExternalTaxonomyIdConflictException>(
-            () => CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None));
+        var adapter = new BlockingSourceTaxonomyAdapter("fake", _ => snapshot);
+        var orchestrator = CreateOrchestrator(adapter);
+
+        var importTask = orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        await adapter.Entered;
+        Assert.NotNull(adapter.CapturedContext);
+        Assert.Null(adapter.CapturedContext!.ExternalTaxonomyId);
+
+        await SetPersistedExternalTaxonomyIdAsync(sourceId, "taxonomy-other");
+
+        adapter.Release();
+
+        await Assert.ThrowsAsync<SourceTaxonomyExternalTaxonomyIdConflictException>(() => importTask);
 
         var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
         Assert.Empty(roots);
 
         var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
-        Assert.Equal("ext-committed", descriptor!.ExternalTaxonomyId);
+        Assert.Equal("taxonomy-other", descriptor!.ExternalTaxonomyId);
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+        Assert.Equal("Failed", importRow.Status);
+    }
+
+    [Fact]
+    public async Task LockedProviderCodeConflict_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("locked-provider-conflict-race", providerCode: "fake-provider");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1", providerCode: "fake-provider"),
+            Nodes = new[] { Node("1") }
+        };
+
+        var adapter = new BlockingSourceTaxonomyAdapter("fake", _ => snapshot);
+        var orchestrator = CreateOrchestrator(adapter);
+
+        var importTask = orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        await adapter.Entered;
+        Assert.NotNull(adapter.CapturedContext);
+        Assert.Equal("fake-provider", adapter.CapturedContext!.ProviderCode);
+
+        // A second process changing persisted ProviderCode is not a normal
+        // synchronization mutation (ProviderCode is not mutable through
+        // SourceTaxonomy synchronization); it exists here purely to prove the
+        // locked-row revalidation is authoritative.
+        await SetPersistedProviderCodeAsync(sourceId, "other-provider");
+
+        adapter.Release();
+
+        // The stale descriptor still agrees with the snapshot, so this
+        // exception cannot come from the Application pre-check.
+        await Assert.ThrowsAsync<SourceTaxonomyProviderMismatchException>(() => importTask);
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.Equal("other-provider", descriptor!.ProviderCode);
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+        Assert.Equal("Failed", importRow.Status);
+    }
+
+    [Fact]
+    public async Task LockedInactiveSource_Detected_Only_At_Transaction_Time_Should_Fail_And_Not_Mutate()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("locked-inactive-race");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[] { Node("1") }
+        };
+
+        var adapter = new BlockingSourceTaxonomyAdapter("fake", _ => snapshot);
+        var orchestrator = CreateOrchestrator(adapter);
+
+        var importTask = orchestrator.ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        // The orchestrator's own pre-load IsActive guard already ran against
+        // the still-active descriptor before adapter.LoadAsync was entered.
+        await adapter.Entered;
+
+        await SetPersistedIsActiveAsync(sourceId, false);
+
+        adapter.Release();
+
+        await Assert.ThrowsAsync<SourceTaxonomyInactiveException>(() => importTask);
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.False(descriptor!.IsActive);
+
+        var failedImportId = await GetLatestFailedImportIdAsync(sourceId);
+        var importRow = await GetImportRowAsync(failedImportId);
+        Assert.Equal("Failed", importRow.Status);
     }
 
     [Fact]
@@ -888,6 +1054,63 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
+    // --- Finding 3: Started -> Completed / Failed terminal-state hardening ---
+
+    [Fact]
+    public async Task CompletedImport_Cannot_Be_Transitioned_To_Failed()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("lifecycle-completed-not-failed");
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[] { Node("1") }
+        };
+
+        var result = await CreateOrchestrator(FakeAdapter("fake", _ => snapshot)).ImportAsync(sourceId, "fake", CancellationToken.None);
+
+        var importRow = await GetImportRowAsync(result.ImportId);
+        Assert.Equal("Completed", importRow.Status);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _importStore.MarkFailedAsync(result.ImportId, "late failure attempt", DateTime.UtcNow, CancellationToken.None));
+
+        var afterAttempt = await GetImportRowAsync(result.ImportId);
+        Assert.Equal("Completed", afterAttempt.Status);
+    }
+
+    [Fact]
+    public async Task FailedImport_Cannot_Be_Transitioned_To_Completed()
+    {
+        var sourceId = await CreateSourceTaxonomyAsync("lifecycle-failed-not-completed");
+
+        var importId = await _importStore.StartAsync(
+            sourceId, "fake", null, null, null, DateTime.UtcNow, CancellationToken.None);
+
+        await _importStore.MarkFailedAsync(importId, "initial failure", DateTime.UtcNow, CancellationToken.None);
+
+        var afterFail = await GetImportRowAsync(importId);
+        Assert.Equal("Failed", afterFail.Status);
+
+        var snapshot = new SourceTaxonomySnapshot
+        {
+            Descriptor = Descriptor(checksum: "c1"),
+            Nodes = new[] { Node("1") }
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _synchronizationStore.ApplyAsync(sourceId, importId, snapshot, DateTime.UtcNow, CancellationToken.None));
+
+        var roots = await _sourceRepository.GetRootsAsync(sourceId, CancellationToken.None);
+        Assert.Empty(roots);
+
+        var descriptor = await _sourceRepository.GetByIdAsync(sourceId, CancellationToken.None);
+        Assert.Null(descriptor!.SourceChecksum);
+
+        var afterAttempt = await GetImportRowAsync(importId);
+        Assert.Equal("Failed", afterAttempt.Status);
+    }
+
     private sealed class DelegateSourceTaxonomyAdapter : ISourceTaxonomyAdapter
     {
         private readonly Func<SourceTaxonomyImportContext, SourceTaxonomySnapshot> _snapshotFactory;
@@ -918,5 +1141,43 @@ public sealed class SourceTaxonomyImportOrchestratorIntegrationTests : IAsyncLif
 
         public Task<SourceTaxonomySnapshot> LoadAsync(SourceTaxonomyImportContext context, CancellationToken cancellationToken)
             => throw _exception;
+    }
+
+    /// <summary>
+    /// Adapter test double that deterministically blocks inside
+    /// <see cref="LoadAsync"/> until released, exposing an <see cref="Entered"/>
+    /// signal and the captured <see cref="SourceTaxonomyImportContext"/>. Used
+    /// to prove the transaction-time locked identity revalidation race
+    /// (Finding 1) without relying on Task.Delay timing.
+    /// </summary>
+    private sealed class BlockingSourceTaxonomyAdapter : ISourceTaxonomyAdapter
+    {
+        private readonly Func<SourceTaxonomyImportContext, SourceTaxonomySnapshot> _snapshotFactory;
+        private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public BlockingSourceTaxonomyAdapter(string adapterCode, Func<SourceTaxonomyImportContext, SourceTaxonomySnapshot> snapshotFactory)
+        {
+            AdapterCode = adapterCode;
+            _snapshotFactory = snapshotFactory;
+        }
+
+        public string AdapterCode { get; }
+
+        public Task Entered => _entered.Task;
+
+        public SourceTaxonomyImportContext? CapturedContext { get; private set; }
+
+        public void Release() => _release.TrySetResult();
+
+        public async Task<SourceTaxonomySnapshot> LoadAsync(SourceTaxonomyImportContext context, CancellationToken cancellationToken)
+        {
+            CapturedContext = context;
+            _entered.TrySetResult();
+
+            await _release.Task;
+
+            return _snapshotFactory(context);
+        }
     }
 }

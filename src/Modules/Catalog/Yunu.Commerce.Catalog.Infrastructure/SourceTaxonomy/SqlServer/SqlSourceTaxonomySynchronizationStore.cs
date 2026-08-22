@@ -552,6 +552,13 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         // Import history must describe the snapshot actually imported (§4),
         // not the pre-import descriptor captured by StartAsync. AdapterCode
         // and StartedAt are left untouched from the Started row.
+        //
+        // Started -> Completed is the only valid transition performed here.
+        // Completed and Failed are terminal states: a Failed row must never
+        // be overwritten back to Completed by a later synchronization pass
+        // reusing the same ImportId. Because this runs inside the
+        // synchronization transaction, a rejected transition rolls back the
+        // whole synchronization (no partial catalog mutation survives).
         const string sql = """
             UPDATE Integration.SourceTaxonomyImports
             SET CompletedAt = @CompletedAt,
@@ -565,6 +572,7 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
                 ExternalVersion = @ExternalVersion,
                 SourceChecksum = @SourceChecksum
             WHERE ImportId = @ImportId
+              AND Status = 'Started'
             """;
 
         await using var command = new SqlCommand(sql, connection, transaction);
@@ -578,7 +586,13 @@ public sealed class SqlSourceTaxonomySynchronizationStore : ISourceTaxonomySynch
         command.Parameters.AddWithValue("@ExternalVersion", (object?)snapshotDescriptor.ExternalVersion ?? DBNull.Value);
         command.Parameters.AddWithValue("@SourceChecksum", (object?)snapshotDescriptor.SourceChecksum ?? DBNull.Value);
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        var affectedRows = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (affectedRows != 1)
+        {
+            throw new InvalidOperationException(
+                $"Expected SourceTaxonomy import {importId} transition Started -> Completed to affect exactly one row, but affected {affectedRows}. The import row is not in the Started state (it may already be Completed or Failed).");
+        }
     }
 
     private sealed record CurrentSourceRow(

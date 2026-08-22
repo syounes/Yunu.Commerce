@@ -65,12 +65,16 @@ public sealed class SqlSourceTaxonomyImportStore : ISourceTaxonomyImportStore
         DateTime completedAtUtc,
         CancellationToken cancellationToken)
     {
+        // Started -> Failed is the only valid transition performed here.
+        // Completed and Failed are terminal: a Completed row must never be
+        // overwritten back to Failed by a stale/secondary failure signal.
         const string sql = """
             UPDATE Integration.SourceTaxonomyImports
             SET CompletedAt = @CompletedAt,
                 Status = 'Failed',
                 ErrorMessage = @ErrorMessage
             WHERE ImportId = @ImportId
+              AND Status = 'Started'
             """;
 
         await using var connection = new SqlConnection(_connectionString);
@@ -81,7 +85,13 @@ public sealed class SqlSourceTaxonomyImportStore : ISourceTaxonomyImportStore
         command.Parameters.AddWithValue("@CompletedAt", completedAtUtc);
         command.Parameters.AddWithValue("@ErrorMessage", Truncate(errorMessage));
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        var affectedRows = await command.ExecuteNonQueryAsync(cancellationToken);
+
+        if (affectedRows != 1)
+        {
+            throw new InvalidOperationException(
+                $"Expected SourceTaxonomy import {importId} transition Started -> Failed to affect exactly one row, but affected {affectedRows}. The import row is not in the Started state (it may already be Completed or Failed).");
+        }
     }
 
     private static string Truncate(string message)
