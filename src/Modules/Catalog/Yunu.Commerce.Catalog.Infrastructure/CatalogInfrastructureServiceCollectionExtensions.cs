@@ -15,6 +15,7 @@ using Yunu.Commerce.Catalog.Application.SegmentCatalog;
 using Yunu.Commerce.Catalog.Application.SegmentDefinitions;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
 using Yunu.Commerce.Catalog.Application.SourceTaxonomy;
+using Yunu.Commerce.Catalog.Application.SourceTaxonomy.Import;
 using Yunu.Commerce.Catalog.Domain.Brands;
 using Yunu.Commerce.Catalog.Domain.CanonicalTaxonomy;
 using Yunu.Commerce.Catalog.Domain.ProductProposals;
@@ -39,6 +40,7 @@ using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.PostgreSql;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.SqlServer;
 using Yunu.Commerce.Catalog.Infrastructure.SegmentEmbeddings.Synchronization.InMemory;
 using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.SqlServer;
+using Yunu.Commerce.Catalog.Infrastructure.SourceTaxonomy.Synchronization.InMemory;
 
 namespace Yunu.Commerce.Catalog.Infrastructure;
 
@@ -128,6 +130,22 @@ public static class CatalogInfrastructureServiceCollectionExtensions
             var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
             return new SqlSourceTaxonomyRepository(connectionString);
         });
+
+        // SourceTaxonomy Phase 3: generic import orchestration infrastructure
+        // (docs/adr/0014-provider-neutral-source-taxonomy.md §9-§18). No concrete
+        // ISourceTaxonomyAdapter is registered here; adapters are provider-specific
+        // and belong to a later phase.
+        services.AddSingleton<ISourceTaxonomyImportStore>(sp =>
+        {
+            var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
+            return new SqlSourceTaxonomyImportStore(connectionString);
+        });
+        services.AddSingleton<ISourceTaxonomySynchronizationStore>(sp =>
+        {
+            var connectionString = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<GoogleTaxonomySqlOptions>>().Value.ConnectionString;
+            return new SqlSourceTaxonomySynchronizationStore(connectionString);
+        });
+        services.AddSingleton<ISourceTaxonomyImportGuard, InMemorySourceTaxonomyImportGuard>();
 
         return services;
     }

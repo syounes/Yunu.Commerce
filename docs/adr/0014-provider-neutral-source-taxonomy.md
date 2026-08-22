@@ -468,6 +468,39 @@ The intended staged implementation sequence, at a high level:
 10. Implement `SourceTaxonomyResolver`.
 11. Run the Google resolver parity gate (§17).
 12. Migrate orchestrator/runtime consumers.
+
+## 21. Implementation Status
+
+Implemented:
+
+- Phase 1 SQL Server foundation (§3-§4, §8;
+  `deploy/databases/sqlserver/014-create-source-taxonomy-foundation.sql`);
+- Phase 2 Application contracts + SQL persistence/readers
+  (`Application.SourceTaxonomy`, `SqlSourceTaxonomyRepository`);
+- Phase 3 provider-neutral adapter contract + generic import orchestration
+  (`Application.SourceTaxonomy.Import`: `ISourceTaxonomyAdapter`,
+  `SourceTaxonomyImportContext`, `SourceTaxonomySnapshot`,
+  `SourceTaxonomySnapshotValidator`, `SourceTaxonomyImportOrchestrator`,
+  `ISourceTaxonomyImportStore`, `ISourceTaxonomySynchronizationStore`,
+  `ISourceTaxonomyImportGuard`; SQL Server implementations:
+  `SqlSourceTaxonomyImportStore`, `SqlSourceTaxonomySynchronizationStore`,
+  `InMemorySourceTaxonomyImportGuard`). Two-pass hierarchy resolution (§7,
+  §14), checksum-based unchanged-snapshot skip (§16), source-identity safety
+  checks (§8) and Started/Completed/Failed import history lifecycle (§8,
+  §11-§12) are implemented and covered by real SQL Server integration tests.
+  No concrete provider adapter exists yet; production adapter registration is
+  intentionally empty.
+
+Still pending:
+
+- concrete Google adapter (`GoogleSourceTaxonomyAdapter`);
+- non-Google proof (e.g. Mercado Livre);
+- schema freeze;
+- pgvector `SourceTaxonomy` projection;
+- `SourceTaxonomy` embedding synchronization;
+- generic semantic search / `SourceTaxonomyResolver`;
+- Google resolver parity gate and consumer migration (§17);
+- `CanonicalTaxonomyResolve` (§19).
 13. Retire the obsolete Google-specific resolver layer, only after parity.
 
 This sequence is architectural guidance. ADR-0014 does not implement any

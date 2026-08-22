@@ -40,6 +40,7 @@ using Yunu.Commerce.Catalog.Application.SegmentDefinitions.UpdateSegmentDefiniti
 using Yunu.Commerce.Catalog.Application.SegmentOptions.CreateSegmentOption;
 using Yunu.Commerce.Catalog.Application.SegmentOptions.UpdateSegmentOption;
 using Yunu.Commerce.Catalog.Application.SegmentEmbeddings;
+using Yunu.Commerce.Catalog.Application.SourceTaxonomy.Import;
 
 namespace Yunu.Commerce.Catalog.Application;
 
@@ -118,6 +119,12 @@ public static class CatalogApplicationServiceCollectionExtensions
 
         services.AddScoped<IGoogleCategoryResolver, GoogleCategoryResolver>();
         services.AddScoped<ICatalogIntentResolutionOrchestrator, CatalogIntentResolutionOrchestrator>();
+
+        // SourceTaxonomy Phase 3: generic, provider-neutral import orchestration
+        // (docs/adr/0014-provider-neutral-source-taxonomy.md §9). No concrete
+        // ISourceTaxonomyAdapter is registered here; an empty adapter set is valid
+        // until a provider adapter is implemented in a later phase.
+        services.AddScoped<SourceTaxonomyImportOrchestrator>();
 
         return services;
     }
